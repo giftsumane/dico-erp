@@ -10,7 +10,7 @@
     <div class="panel"><div class="panel-body">
         <h2 style="margin:0 0 8px;">{{ $event->name }}</h2>
         <p>{{ $event->venue ?: 'Local não indicado' }}<br>Armazém: {{ $event->warehouseStore->name }}<br>{{ $event->bars->count() }} bar(es)</p>
-        <a class="topbar-button" href="{{ route('events.stock-orders.index', $event) }}">Abrir encomendas</a>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;"><a class="topbar-button" href="{{ route('events.warehouse.index', $event) }}">Armazém</a><a class="topbar-button" href="{{ route('events.stock-orders.index', $event) }}">Encomendas</a></div>
     </div></div>
 @empty
     <div class="panel"><div class="panel-body">Não existem eventos operacionais associados à sua conta.</div></div>

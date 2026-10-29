@@ -30,6 +30,7 @@ use App\Http\Controllers\EventController;
 use App\Http\Controllers\EventOperationController;
 use App\Http\Controllers\BarStockOrderController;
 use App\Http\Controllers\EventOperationsDashboardController;
+use App\Http\Controllers\EventWarehouseController;
 
 /*
 |--------------------------------------------------------------------------
@@ -295,6 +296,10 @@ Route::middleware([
         Route::middleware('feature:event_bars')->group(function () {
             Route::get('/event-operations', [EventOperationsDashboardController::class, 'index'])
                 ->name('event-operations.index');
+            Route::get('/events/{event}/warehouse', [EventWarehouseController::class, 'index'])
+                ->name('events.warehouse.index');
+            Route::post('/events/{event}/warehouse/stock', [EventWarehouseController::class, 'receiveStock'])
+                ->name('events.warehouse.stock.receive');
             Route::get('/events/{event}/stock-orders', [BarStockOrderController::class, 'index'])
                 ->name('events.stock-orders.index');
             Route::get('/events/{event}/stock-orders/create', [BarStockOrderController::class, 'create'])

@@ -15,7 +15,7 @@
 
 <div class="page-heading"><h1>{{ $event->name }}</h1><p>{{ $event->code }} · {{ $event->venue ?: 'Local não indicado' }} · Armazém: <strong>{{ $event->warehouseStore->name }}</strong></p></div>
 
-<div style="display:flex;justify-content:flex-end;margin-bottom:18px;"><a class="topbar-button" href="{{ route('events.stock-orders.index', $event) }}">Encomendas de stock</a></div>
+<div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:18px;"><a class="topbar-button" href="{{ route('events.warehouse.index', $event) }}">Gerir armazém</a><a class="topbar-button" href="{{ route('events.stock-orders.index', $event) }}">Encomendas de stock</a></div>
 
 <div class="panel"><div class="panel-header"><div><h2 class="panel-title">Adicionar bar</h2><p class="panel-subtitle">Um bar agrupa vários balcões, mas não mistura os respectivos stocks.</p></div></div><div class="panel-body">
     <form method="POST" action="{{ route('events.bars.store', $event) }}" style="display:grid;grid-template-columns:1fr 2fr 120px auto;gap:12px;align-items:end;">

@@ -144,6 +144,12 @@ class EventOperationController extends Controller
             ]);
         }
 
+        if (in_array($data['role'], ['event_manager', 'warehouse_manager', 'warehouse_operator'], true)) {
+            $event->warehouseStore->users()->syncWithoutDetaching([
+                $user->id => ['status' => 'active'],
+            ]);
+        }
+
         return back()->with('success', 'Responsabilidade operacional atribuída.');
     }
 

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Company;
 use App\Models\Event;
 use App\Models\EventBar;
+use App\Models\Product;
 use App\Models\Store;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -143,6 +144,45 @@ class EventOperationsTest extends TestCase
             ->withSession($this->context())
             ->get(route('events.show', $otherEvent))
             ->assertForbidden();
+    }
+
+    public function test_warehouse_manager_can_register_event_stock_entry(): void
+    {
+        $event = $this->createEvent();
+        $product = Product::create([
+            'company_id' => $this->company->id,
+            'product_type' => Product::TYPE_SIMPLE,
+            'inventory_mode' => Product::INVENTORY_SIMPLE,
+            'name' => 'Cerveja',
+            'purchase_price' => 500,
+            'sale_price' => 750,
+            'minimum_stock' => 10,
+            'track_stock' => true,
+            'active' => true,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->withSession($this->context())
+            ->post(route('events.warehouse.stock.receive', $event), [
+                'product_id' => $product->id,
+                'quantity' => 24,
+                'reference' => 'GUIA-001',
+                'notes' => 'Entrada inicial para o evento',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('stocks', [
+            'company_id' => $this->company->id,
+            'store_id' => $this->warehouse->id,
+            'product_id' => $product->id,
+            'quantity' => 24,
+        ]);
+        $this->assertDatabaseHas('stock_movements', [
+            'store_id' => $this->warehouse->id,
+            'product_id' => $product->id,
+            'type' => 'entry',
+            'reference' => 'GUIA-001',
+        ]);
     }
 
     private function createEvent(): Event
