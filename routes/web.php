@@ -28,6 +28,8 @@ use App\Http\Controllers\SaleReturnController;
 use App\Http\Controllers\ReturnBrowseController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\EventOperationController;
+use App\Http\Controllers\BarStockOrderController;
+use App\Http\Controllers\EventOperationsDashboardController;
 
 /*
 |--------------------------------------------------------------------------
@@ -288,6 +290,31 @@ Route::middleware([
                 [ReceivableController::class, 'payment']
             )->name('receivables.payments.store');
 
+        });
+
+        Route::middleware('feature:event_bars')->group(function () {
+            Route::get('/event-operations', [EventOperationsDashboardController::class, 'index'])
+                ->name('event-operations.index');
+            Route::get('/events/{event}/stock-orders', [BarStockOrderController::class, 'index'])
+                ->name('events.stock-orders.index');
+            Route::get('/events/{event}/stock-orders/create', [BarStockOrderController::class, 'create'])
+                ->name('events.stock-orders.create');
+            Route::post('/events/{event}/stock-orders', [BarStockOrderController::class, 'store'])
+                ->name('events.stock-orders.store');
+            Route::get('/events/{event}/stock-orders/{stockOrder}', [BarStockOrderController::class, 'show'])
+                ->name('events.stock-orders.show');
+            Route::post('/events/{event}/stock-orders/{stockOrder}/approve', [BarStockOrderController::class, 'approve'])
+                ->name('events.stock-orders.approve');
+            Route::post('/events/{event}/stock-orders/{stockOrder}/prepare', [BarStockOrderController::class, 'prepare'])
+                ->name('events.stock-orders.prepare');
+            Route::post('/events/{event}/stock-orders/{stockOrder}/dispatch', [BarStockOrderController::class, 'dispatch'])
+                ->name('events.stock-orders.dispatch');
+            Route::post('/events/{event}/stock-orders/{stockOrder}/receive', [BarStockOrderController::class, 'receive'])
+                ->name('events.stock-orders.receive');
+            Route::post('/events/{event}/stock-orders/{stockOrder}/settlements', [BarStockOrderController::class, 'storeSettlement'])
+                ->name('events.stock-orders.settlements.store');
+            Route::post('/events/{event}/stock-orders/{stockOrder}/settlements/{settlement}/confirm', [BarStockOrderController::class, 'confirmSettlement'])
+                ->name('events.stock-orders.settlements.confirm');
         });
 
     });

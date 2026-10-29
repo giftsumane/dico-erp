@@ -54,4 +54,9 @@ class Event extends Model
     {
         return $this->hasMany(EventAsset::class);
     }
+
+    public function stockOrders(): HasMany
+    {
+        return $this->hasMany(BarStockOrder::class);
+    }
 }

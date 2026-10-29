@@ -29,4 +29,9 @@ class EventCounter extends Model
     {
         return $this->hasMany(EventAsset::class);
     }
+
+    public function stockPolicies(): HasMany
+    {
+        return $this->hasMany(CounterStockPolicy::class);
+    }
 }

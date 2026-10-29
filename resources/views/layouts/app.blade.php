@@ -1007,6 +1007,16 @@
 
             </a>
 
+            @if ($canOperate && $canEventBars)
+                <a
+                    href="{{ route('event-operations.index') }}"
+                    class="sidebar-link {{ request()->routeIs('event-operations.*', 'events.stock-orders.*') ? 'active' : '' }}"
+                >
+                    <span class="sidebar-icon">♜</span>
+                    Operação dos Bares
+                </a>
+            @endif
+
 
             {{-- POS - FEATURE: pos --}}
 

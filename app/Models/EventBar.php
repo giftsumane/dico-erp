@@ -24,4 +24,9 @@ class EventBar extends Model
     {
         return $this->hasMany(EventAssignment::class);
     }
+
+    public function stockOrders(): HasMany
+    {
+        return $this->hasMany(BarStockOrder::class);
+    }
 }
