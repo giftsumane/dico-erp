@@ -146,6 +146,13 @@ class BusinessFeatureController extends Controller
                     'Fluxo de pedidos e preparação na cozinha.',
                 'group' => 'food',
             ],
+
+            'event_bars' => [
+                'label' => 'Operações de Bares em Eventos',
+                'description' =>
+                    'Eventos, bares, balcões, equipas e responsabilidades operacionais.',
+                'group' => 'events',
+            ],
         ];
 
         /*

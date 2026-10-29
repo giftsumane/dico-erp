@@ -935,6 +935,11 @@
         $activeCompany
         ? $activeCompany->hasFeature('kitchen')
         : false;
+
+    $canEventBars =
+        $activeCompany
+        ? $activeCompany->hasFeature('event_bars')
+        : false;
 @endphp
 
 
@@ -1186,6 +1191,16 @@
 
 
             <nav class="sidebar-menu">
+
+                @if ($canEventBars)
+                    <a
+                        href="{{ route('events.index') }}"
+                        class="sidebar-link {{ request()->routeIs('events.*') ? 'active' : '' }}"
+                    >
+                        <span class="sidebar-icon">♜</span>
+                        Eventos e Bares
+                    </a>
+                @endif
 
                 {{-- ========================================================
                      PRODUTOS - CORE

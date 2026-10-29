@@ -26,6 +26,8 @@ use App\Http\Controllers\ProductAttributeController;
 use App\Http\Controllers\ProductAttributeValueController;
 use App\Http\Controllers\SaleReturnController;
 use App\Http\Controllers\ReturnBrowseController;
+use App\Http\Controllers\EventController;
+use App\Http\Controllers\EventOperationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -729,6 +731,29 @@ Route::middleware([
                 [ReportController::class, 'index']
             )->name('reports.index');
 
+        });
+
+        /*
+        |--------------------------------------------------------------------------
+        | Eventos, bares e balcões
+        |--------------------------------------------------------------------------
+        */
+
+        Route::middleware('feature:event_bars')->group(function () {
+            Route::get('/events', [EventController::class, 'index'])
+                ->name('events.index');
+            Route::get('/events/create', [EventController::class, 'create'])
+                ->name('events.create');
+            Route::post('/events', [EventController::class, 'store'])
+                ->name('events.store');
+            Route::get('/events/{event}', [EventController::class, 'show'])
+                ->name('events.show');
+            Route::post('/events/{event}/bars', [EventOperationController::class, 'storeBar'])
+                ->name('events.bars.store');
+            Route::post('/events/{event}/bars/{bar}/counters', [EventOperationController::class, 'storeCounter'])
+                ->name('events.counters.store');
+            Route::post('/events/{event}/assignments', [EventOperationController::class, 'storeAssignment'])
+                ->name('events.assignments.store');
         });
 
     });

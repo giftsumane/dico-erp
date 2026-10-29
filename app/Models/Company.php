@@ -213,4 +213,9 @@ class Company extends Model
         return $this->hasMany(StockBatch::class);
     }
 
+    public function events(): HasMany
+    {
+        return $this->hasMany(Event::class);
+    }
+
 }

@@ -30,6 +30,12 @@
             'description' =>
                 'Funcionalidades destinadas a restaurantes e pastelarias.',
         ],
+
+        'events' => [
+            'title' => 'Eventos e Bares',
+            'description' =>
+                'Estrutura operacional para armazéns, bares, balcões e equipas.',
+        ],
     ];
 @endphp
 

@@ -49,6 +49,9 @@ class CompanyFeatures
     public const KITCHEN =
         'kitchen';
 
+    public const EVENT_BARS =
+        'event_bars';
+
 
     public static function all(): array
     {
@@ -68,6 +71,7 @@ class CompanyFeatures
             self::INGREDIENTS,
             self::TABLES,
             self::KITCHEN,
+            self::EVENT_BARS,
         ];
     }
 }
