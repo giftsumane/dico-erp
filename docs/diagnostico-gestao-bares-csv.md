@@ -376,16 +376,20 @@ Lista indicativa; os nomes finais devem ser confirmados em cada fase.
 
 Não se deve modificar migrations já aplicadas; todas as mudanças estruturais serão migrations novas e reversíveis.
 
-## 10. Decisões que precisam de validação antes da Fase 1
+## 10. Decisões operacionais validadas
 
-1. Cada um dos quatro balcões mantém stock próprio? Se sim, cada balcão será uma `store`, como recomendado.
-2. “Bar” e “balcão” são sinónimos no primeiro evento, ou um bar pode possuir vários balcões com stock partilhado?
-3. O atendente cria um pedido separado para o caixa, ou o caixa regista a venda completa? Recomenda-se venda completa no caixa para o MVP.
-4. Quem pode aprovar reposições e quais limites dispensam aprovação manual?
-5. Quais tolerâncias monetárias e de stock exigem aprovação/escalonamento?
-6. Há Internet/rede local estável no recinto? Sem isso, deve ser planeado um modo de continuidade operacional antes do festival.
-7. Os comprovativos M-Pesa/e-Mola serão digitados, fotografados ou integrados por API?
-8. Qual é a definição de turno e pode um operador trocar de balcão durante o turno?
+Em 29 de Outubro de 2026 foram confirmadas as seguintes decisões:
+
+1. Cada balcão mantém stock próprio e corresponde a uma `store` operacional independente.
+2. Um bar agrupa vários balcões; o bar é uma unidade de gestão, não uma unidade que mistura os stocks.
+3. Cada balcão possui um caixa e dois atendentes. Para reduzir congestionamento, o caixa regista o pedido e recebe o pagamento no mesmo passo; os atendentes preparam e entregam em paralelo. Sempre que o espaço permitir, uma fila única do bar alimenta o primeiro balcão disponível.
+4. Cada bar possui um gestor de stock responsável por encomendar ao armazém e distribuir a mercadoria pelos balcões.
+5. O armazém possui gestão própria. Uma nova encomenda só é expedida depois da liquidação e reconciliação da entrega anterior, salvo excepção superior auditada.
+6. A primeira entrega inclui stock operacional e uma reserva inicial (por exemplo, duas caixas de cerveja) para manter as vendas durante o fecho e pagamento da encomenda anterior.
+7. A encomenda é consolidada por bar, mas cada linha/volume identifica o balcão de destino. A transferência de stock e a liquidação financeira são registos distintos; não são vendas comerciais ao público.
+8. Haverá Internet no recinto e o armazém ficará atrás do bar, reduzindo o tempo de deslocação.
+
+Permanecem por definir as tolerâncias de diferenças, o formato dos comprovativos electrónicos, a definição exacta de turno e o procedimento de contingência se a Internet falhar.
 
 ## 11. Recomendação de deploy
 
