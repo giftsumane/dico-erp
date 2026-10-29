@@ -4,7 +4,8 @@
 @section('topbar-title', 'Gestão do Armazém')
 
 @section('content')
-<div class="page-heading" style="display:flex;justify-content:space-between;align-items:center;gap:20px;">
+<div class="event-operation-page">
+<div class="page-heading operation-heading">
     <div><h1>{{ $warehouse->name }}</h1><p>{{ $event->name }} · stock central, encomendas, despachos e valores por receber.</p></div>
     <a class="topbar-button" href="{{ route('events.stock-orders.index', $event) }}">Todas as encomendas</a>
 </div>
@@ -21,7 +22,7 @@
 </div>
 
 <div class="panel"><div class="panel-header"><div><h2 class="panel-title">Entrada rápida no armazém</h2><p class="panel-subtitle">Regista mercadoria recebida fisicamente. A nota é obrigatória para auditoria.</p></div></div><div class="panel-body">
-    <form method="POST" action="{{ route('events.warehouse.stock.receive', $event) }}" style="display:grid;grid-template-columns:2fr 1fr 1.5fr 2fr auto;gap:12px;align-items:end;">@csrf
+    <form class="operation-form" method="POST" action="{{ route('events.warehouse.stock.receive', $event) }}" style="grid-template-columns:2fr 1fr 1.5fr 2fr auto;">@csrf
         <div class="form-group"><label class="form-label">Produto</label><select class="form-control" name="product_id" required><option value="">Seleccione</option>@foreach($products as $product)<option value="{{ $product->id }}">{{ $product->name }}</option>@endforeach</select></div>
         <div class="form-group"><label class="form-label">Quantidade</label><input class="form-control" type="number" min="0.001" step="0.001" name="quantity" required></div>
         <div class="form-group"><label class="form-label">Referência</label><input class="form-control" name="reference" placeholder="Factura/guia"></div>
@@ -39,10 +40,11 @@
 </tbody></table></div></div></div>
 
 <div class="panel" style="margin-top:20px;"><div class="panel-header"><div><h2 class="panel-title">Pagamentos pendentes de confirmação</h2></div></div><div class="panel-body">
-@forelse($pendingSettlements as $settlement)<div style="display:flex;justify-content:space-between;gap:16px;padding:12px 0;border-top:1px solid #e5e7eb;"><span>{{ $settlement->order->bar->name }} · {{ $settlement->payer->name }} · {{ $settlement->method }}</span><strong>{{ number_format((float)$settlement->amount, 2, ',', '.') }} MT — <a href="{{ route('events.stock-orders.show', [$event, $settlement->order]) }}">confirmar</a></strong></div>@empty<p>Sem pagamentos pendentes.</p>@endforelse
+@forelse($pendingSettlements as $settlement)<div class="operation-payment-row" style="justify-content:space-between;padding:12px 0;"><span>{{ $settlement->order->bar->name }} · {{ $settlement->payer->name }} · {{ $settlement->method }}</span><strong>{{ number_format((float)$settlement->amount, 2, ',', '.') }} MT — <a href="{{ route('events.stock-orders.show', [$event, $settlement->order]) }}">confirmar</a></strong></div>@empty<p>Sem pagamentos pendentes.</p>@endforelse
 </div></div>
 
 <div class="panel" style="margin-top:20px;"><div class="panel-header"><div><h2 class="panel-title">Últimos movimentos</h2></div></div><div class="panel-body"><div style="overflow:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr><th align="left">Data</th><th align="left">Produto</th><th align="left">Tipo</th><th align="right">Quantidade</th><th align="left">Responsável</th></tr></thead><tbody>
 @forelse($movements as $movement)<tr style="border-top:1px solid #e5e7eb;"><td style="padding:12px 6px;">{{ $movement->occurred_at->format('d/m H:i') }}</td><td>{{ $movement->product->name }}</td><td>{{ $movement->type }}</td><td align="right">{{ number_format((float)$movement->quantity, 3, ',', '.') }}</td><td>{{ $movement->user?->name ?: 'Sistema' }}</td></tr>@empty<tr><td colspan="5" style="padding:18px;text-align:center;">Sem movimentos.</td></tr>@endforelse
 </tbody></table></div></div></div>
+</div>
 @endsection

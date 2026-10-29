@@ -4,7 +4,8 @@
 @section('topbar-title', 'Eventos e Bares')
 
 @section('content')
-<div class="page-heading" style="display:flex;justify-content:space-between;align-items:center;gap:20px;">
+<div class="event-operation-page">
+<div class="page-heading operation-heading">
     <div>
         <h1>Operações de eventos</h1>
         <p>Organize o armazém, os bares, os balcões e as responsabilidades.</p>
@@ -35,5 +36,6 @@
         </div>
         <div style="margin-top:20px;">{{ $events->links() }}</div>
     </div>
+</div>
 </div>
 @endsection

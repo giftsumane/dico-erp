@@ -4,6 +4,7 @@
 @section('topbar-title', 'Novo Evento')
 
 @section('content')
+<div class="event-operation-page">
 <div class="page-heading"><h1>Criar evento</h1><p>Seleccione a loja que funcionará como armazém central. Os balcões serão criados depois.</p></div>
 
 <div class="panel"><div class="panel-body">
@@ -19,7 +20,8 @@
             <div class="form-group"><label class="form-label">Fuso horário</label><input class="form-control" name="timezone" value="{{ old('timezone', 'Africa/Maputo') }}" required></div>
         </div>
         <div class="form-group" style="margin-top:18px;"><label class="form-label">Notas</label><textarea class="form-control" name="notes" rows="3">{{ old('notes') }}</textarea></div>
-        <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:20px;"><a href="{{ route('events.index') }}">Cancelar</a><button class="topbar-button" type="submit">Criar evento</button></div>
+        <div class="operation-actions" style="margin-top:20px;"><a href="{{ route('events.index') }}">Cancelar</a><button class="topbar-button" type="submit">Criar evento</button></div>
     </form>
 </div></div>
+</div>
 @endsection

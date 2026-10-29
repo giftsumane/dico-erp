@@ -712,6 +712,57 @@
             display: none;
         }
 
+        .event-operation-page .operation-heading,
+        .event-operation-page .operation-actions,
+        .event-operation-page .operation-payment-row {
+            display: flex;
+            gap: 12px;
+        }
+
+        .event-operation-page .operation-heading {
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .event-operation-page .operation-actions {
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .event-operation-page .operation-form {
+            display: grid;
+            gap: 12px;
+            align-items: end;
+        }
+
+        .event-operation-page .operation-table-scroll,
+        .event-operation-page .panel-body > div[style*="overflow"] {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .event-operation-page .operation-table,
+        .event-operation-page table {
+            width: 100%;
+            min-width: 680px;
+            border-collapse: collapse;
+        }
+
+        .event-operation-page .operation-table th,
+        .event-operation-page .operation-table td,
+        .event-operation-page table th,
+        .event-operation-page table td {
+            padding: 12px 8px;
+            vertical-align: middle;
+        }
+
+        .event-operation-page .operation-table tbody tr,
+        .event-operation-page table tbody tr {
+            border-top: 1px solid #e5e7eb;
+        }
+
         @media (max-width: 1100px) {
 
             .metric-grid {
@@ -771,6 +822,86 @@
 
             .mobile-menu-button {
                 display: inline-flex;
+            }
+
+            .event-operation-page .operation-heading {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .event-operation-page .operation-heading h1 {
+                font-size: 25px;
+                line-height: 1.2;
+            }
+
+            .event-operation-page .operation-form,
+            .event-operation-page form[style*="display:grid"] {
+                grid-template-columns: 1fr !important;
+            }
+
+            .event-operation-page .operation-actions,
+            .event-operation-page .operation-payment-row {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .event-operation-page .operation-actions .topbar-button,
+            .event-operation-page .operation-actions form,
+            .event-operation-page .operation-actions form .topbar-button,
+            .event-operation-page .operation-form > .topbar-button,
+            .event-operation-page .operation-primary-action {
+                box-sizing: border-box;
+                justify-content: center;
+                min-height: 46px;
+                width: 100%;
+            }
+
+            .event-operation-page .form-control {
+                min-height: 46px;
+                font-size: 16px;
+            }
+
+            .event-operation-page textarea.form-control {
+                min-height: 92px;
+            }
+
+            .event-operation-page .panel-header,
+            .event-operation-page .panel-body {
+                padding-left: 14px;
+                padding-right: 14px;
+            }
+
+            .event-operation-page .operation-table,
+            .event-operation-page table {
+                min-width: 620px;
+            }
+
+            .event-operation-page .operation-table th,
+            .event-operation-page .operation-table td,
+            .event-operation-page table th,
+            .event-operation-page table td {
+                white-space: nowrap;
+            }
+
+            .event-operation-page .operation-table a,
+            .event-operation-page .operation-table button,
+            .event-operation-page table a,
+            .event-operation-page table button {
+                display: inline-flex;
+                align-items: center;
+                min-height: 42px;
+                padding: 8px 10px;
+            }
+
+            .event-operation-page .operation-payment-row {
+                border-top: 1px solid #e5e7eb;
+            }
+
+            .event-operation-page .operation-payment-row strong {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
             }
 
         }

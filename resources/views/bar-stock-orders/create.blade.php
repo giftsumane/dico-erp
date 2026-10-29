@@ -4,6 +4,7 @@
 @section('topbar-title', 'Nova Encomenda')
 
 @section('content')
+<div class="event-operation-page">
 <div class="page-heading"><h1>Encomendar stock ao armazém</h1><p>Uma encomenda pode distribuir produtos por vários balcões do mesmo bar.</p></div>
 
 <div class="panel"><div class="panel-body">
@@ -12,9 +13,9 @@
     <input type="hidden" name="idempotency_key" value="{{ $idempotencyKey }}">
     <div class="form-group"><label class="form-label">Bar</label><select class="form-control" name="event_bar_id" id="bar-select" required><option value="">Seleccione</option>@foreach($event->bars as $bar)<option value="{{ $bar->id }}">{{ $bar->name }}</option>@endforeach</select></div>
     <div style="margin-top:20px;overflow:auto;"><table style="width:100%;border-collapse:collapse;" id="items-table"><thead><tr><th align="left">Balcão</th><th align="left">Produto</th><th>Quantidade</th><th>Reserva inicial</th><th></th></tr></thead><tbody></tbody></table></div>
-    <button type="button" class="topbar-button" style="margin-top:14px;" onclick="addRow()">Adicionar produto</button>
+    <button type="button" class="topbar-button operation-primary-action" style="margin-top:14px;" onclick="addRow()">Adicionar produto</button>
     <div class="form-group" style="margin-top:18px;"><label class="form-label">Notas</label><textarea class="form-control" name="notes" rows="3"></textarea></div>
-    <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:20px;"><a href="{{ route('events.stock-orders.index', $event) }}">Cancelar</a><button class="topbar-button" type="submit">Enviar pedido</button></div>
+    <div class="operation-actions" style="margin-top:20px;"><a href="{{ route('events.stock-orders.index', $event) }}">Cancelar</a><button class="topbar-button" type="submit">Enviar pedido</button></div>
 </form>
 </div></div>
 
@@ -45,4 +46,5 @@ document.getElementById('bar-select').addEventListener('change', () => {
     rowIndex = 0;
 });
 </script>
+</div>
 @endsection

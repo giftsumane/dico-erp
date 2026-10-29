@@ -4,7 +4,8 @@
 @section('topbar-title', 'Encomendas de Stock')
 
 @section('content')
-<div class="page-heading" style="display:flex;justify-content:space-between;align-items:center;gap:20px;">
+<div class="event-operation-page">
+<div class="page-heading operation-heading">
     <div><h1>Encomendas — {{ $event->name }}</h1><p>Liquidação, preparação, despacho e recepção de mercadoria dos bares.</p></div>
     <a class="topbar-button" href="{{ route('events.stock-orders.create', $event) }}">Nova encomenda</a>
 </div>
@@ -24,4 +25,5 @@
         @empty<tr><td colspan="7" style="padding:30px;text-align:center;">Nenhuma encomenda registada.</td></tr>@endforelse</tbody>
     </table>
 </div><div style="margin-top:20px;">{{ $orders->links() }}</div></div></div>
+</div>
 @endsection
