@@ -518,7 +518,7 @@ class ProductController extends Controller
         $company = app('activeCompany');
 
         abort_unless(
-            $product->company_id === $company->id,
+            (int) $product->company_id === (int) $company->id,
             403
         );
 
@@ -653,7 +653,7 @@ class ProductController extends Controller
         $company = app('activeCompany');
 
         abort_unless(
-            $product->company_id === $company->id,
+            (int) $product->company_id === (int) $company->id,
             403
         );
 
@@ -1762,7 +1762,7 @@ class ProductController extends Controller
         $company = app('activeCompany');
 
         abort_unless(
-            $product->company_id === $company->id,
+            (int) $product->company_id === (int) $company->id,
             403
         );
 
@@ -2034,12 +2034,12 @@ class ProductController extends Controller
         $company = app('activeCompany');
 
         abort_unless(
-            $product->company_id === $company->id,
+            (int) $product->company_id === (int) $company->id,
             403
         );
 
         abort_unless(
-            $variant->company_id === $company->id,
+            (int) $variant->company_id === (int) $company->id,
             403
         );
 

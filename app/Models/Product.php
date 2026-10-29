@@ -54,6 +54,11 @@ class Product extends Model
     ];
 
     protected $casts = [
+        'company_id' => 'integer',
+        'parent_id' => 'integer',
+        'category_id' => 'integer',
+        'brand_id' => 'integer',
+        'unit_id' => 'integer',
         'purchase_price' => 'decimal:2',
         'sale_price' => 'decimal:2',
         'tax_rate' => 'decimal:2',
