@@ -10,6 +10,7 @@ class Payment extends Model
         'sale_id',
         'cash_register_id',
         'user_id',
+        'idempotency_key',
         'method',
         'amount',
         'reference',

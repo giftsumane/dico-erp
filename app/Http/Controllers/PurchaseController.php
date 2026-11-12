@@ -8,6 +8,7 @@ use App\Models\PurchaseItem;
 use App\Models\StockBatch;
 use App\Models\Supplier;
 use App\Services\StockService;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -453,7 +454,8 @@ class PurchaseController extends Controller
 
     public function confirm(
         Purchase $purchase,
-        StockService $stockService
+        StockService $stockService,
+        AuditService $auditService
     ) {
         $this->ensurePurchaseAccess($purchase);
 
@@ -480,6 +482,7 @@ class PurchaseController extends Controller
         DB::transaction(function () use (
             $purchase,
             $stockService,
+            $auditService,
             $company
         ) {
             $lockedPurchase = Purchase::query()
@@ -623,6 +626,12 @@ class PurchaseController extends Controller
             $lockedPurchase->update([
                 'status' => 'confirmed',
                 'confirmed_at' => now(),
+            ]);
+
+            $auditService->record('purchase.confirmed', $lockedPurchase, [
+                'number' => $lockedPurchase->number,
+                'total' => (float) $lockedPurchase->total,
+                'items_count' => $lockedPurchase->items->count(),
             ]);
         });
 

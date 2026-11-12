@@ -8,6 +8,7 @@ use App\Models\Sale;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use App\Services\AuditService;
 
 class ReceivableController extends Controller
 {
@@ -399,11 +400,28 @@ class ReceivableController extends Controller
 
     public function payment(
         Request $request,
-        Sale $sale
+        Sale $sale,
+        AuditService $auditService
     ) {
         $this->ensureAccess(
             $sale
         );
+
+        $request->validate([
+            'idempotency_key' => ['required', 'uuid'],
+        ]);
+
+        if (
+            Payment::query()
+                ->where('sale_id', $sale->id)
+                ->where('idempotency_key', $request->input('idempotency_key'))
+                ->exists()
+        ) {
+            return back()->with(
+                'success',
+                'Este pagamento já tinha sido registado.'
+            );
+        }
 
         /*
         |--------------------------------------------------------------------------
@@ -428,6 +446,11 @@ class ReceivableController extends Controller
         */
 
         $data = $request->validate([
+            'idempotency_key' => [
+                'required',
+                'uuid',
+            ],
+
             'method' => [
                 'required',
                 'in:cash,mpesa,emola,card,bank_transfer,other',
@@ -532,7 +555,8 @@ class ReceivableController extends Controller
                 $sale,
                 $data,
                 $amount,
-                $cashRegister
+                $cashRegister,
+                $auditService
             ) {
                 /*
                 |--------------------------------------------------------------------------
@@ -547,6 +571,15 @@ class ReceivableController extends Controller
                     )
                     ->lockForUpdate()
                     ->firstOrFail();
+
+                if (
+                    Payment::query()
+                        ->where('sale_id', $lockedSale->id)
+                        ->where('idempotency_key', $data['idempotency_key'])
+                        ->exists()
+                ) {
+                    return;
+                }
 
                 /*
                 |--------------------------------------------------------------------------
@@ -565,21 +598,46 @@ class ReceivableController extends Controller
                     ]);
                 }
 
+                $lockedCashRegister = null;
+
+                if ($cashRegister) {
+                    $lockedCashRegister = CashRegister::query()
+                        ->whereKey($cashRegister->id)
+                        ->where('company_id', $lockedSale->company_id)
+                        ->where('store_id', $lockedSale->store_id)
+                        ->where('user_id', auth()->id())
+                        ->lockForUpdate()
+                        ->first();
+                }
+
+                if (
+                    $data['method'] === 'cash'
+                    && (! $lockedCashRegister || $lockedCashRegister->status !== 'open')
+                ) {
+                    throw ValidationException::withMessages([
+                        'method' =>
+                            'O caixa foi fechado. Abra um caixa antes de receber dinheiro.',
+                    ]);
+                }
+
                 /*
                 |--------------------------------------------------------------------------
                 | Criar pagamento
                 |--------------------------------------------------------------------------
                 */
 
-                Payment::create([
+                $payment = Payment::create([
                     'sale_id' =>
                         $lockedSale->id,
 
                     'cash_register_id' =>
-                        $cashRegister?->id,
+                        $lockedCashRegister?->id,
 
                     'user_id' =>
                         auth()->id(),
+
+                    'idempotency_key' =>
+                        $data['idempotency_key'],
 
                     'method' =>
                         $data['method'],
@@ -659,6 +717,13 @@ class ReceivableController extends Controller
                         $amountDue <= 0
                             ? null
                             : $lockedSale->due_date,
+                ]);
+
+                $auditService->record('receivable.payment_recorded', $lockedSale, [
+                    'payment_id' => $payment->id,
+                    'method' => $payment->method,
+                    'amount' => (float) $payment->amount,
+                    'remaining_due' => $amountDue,
                 ]);
             }
         );

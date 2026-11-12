@@ -4,15 +4,18 @@ namespace Tests\Feature;
 
 use App\Models\CashRegister;
 use App\Models\Company;
+use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\PurchaseItem;
+use App\Models\Sale;
 use App\Models\Stock;
 use App\Models\Store;
 use App\Models\User;
 use App\Services\StockService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class CoreErpOperationsTest extends TestCase
@@ -47,7 +50,7 @@ class CoreErpOperationsTest extends TestCase
         ]);
         $this->store->users()->attach($this->owner->id, ['status' => 'active']);
 
-        foreach (['inventory', 'purchases', 'pos', 'sales'] as $feature) {
+        foreach (['inventory', 'purchases', 'pos', 'sales', 'receivables'] as $feature) {
             $this->company->enableFeature($feature);
         }
     }
@@ -89,6 +92,10 @@ class CoreErpOperationsTest extends TestCase
             'quantity' => 10,
         ]);
         $this->assertSame('confirmed', $purchase->fresh()->status);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'purchase.confirmed',
+            'subject_id' => $purchase->id,
+        ]);
 
         $this->actingAs($this->owner)
             ->withSession($this->context())
@@ -116,17 +123,20 @@ class CoreErpOperationsTest extends TestCase
             'opened_at' => now(),
         ]);
 
+        $payload = [
+            'idempotency_key' => (string) Str::uuid(),
+            'payment_type' => 'full',
+            'payment_method' => 'cash',
+            'amount_received' => 500,
+            'items' => [[
+                'product_id' => $product->id,
+                'quantity' => 2,
+            ]],
+        ];
+
         $response = $this->actingAs($this->owner)
             ->withSession($this->context())
-            ->post(route('pos.complete'), [
-                'payment_type' => 'full',
-                'payment_method' => 'cash',
-                'amount_received' => 500,
-                'items' => [[
-                    'product_id' => $product->id,
-                    'quantity' => 2,
-                ]],
-            ]);
+            ->post(route('pos.complete'), $payload);
 
         $response->assertSessionHasNoErrors();
         $sale = $register->sales()->firstOrFail();
@@ -139,6 +149,71 @@ class CoreErpOperationsTest extends TestCase
             'cash_register_id' => $register->id,
             'method' => 'cash',
             'amount' => 300,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->withSession($this->context())
+            ->post(route('pos.complete'), $payload)
+            ->assertRedirect(route('pos.receipt', $sale));
+
+        $this->assertDatabaseCount('sales', 1);
+        $this->assertDatabaseCount('payments', 1);
+        $this->assertSame('8.000', Stock::firstOrFail()->quantity);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'sale.completed',
+            'subject_id' => $sale->id,
+        ]);
+    }
+
+    public function test_receivable_payment_is_idempotent_and_audited(): void
+    {
+        $customer = Customer::create([
+            'company_id' => $this->company->id,
+            'name' => 'Cliente a Crédito',
+            'active' => true,
+        ]);
+        $sale = Sale::create([
+            'company_id' => $this->company->id,
+            'store_id' => $this->store->id,
+            'customer_id' => $customer->id,
+            'user_id' => $this->owner->id,
+            'number' => 'VND-CREDITO',
+            'status' => 'completed',
+            'payment_status' => 'partial',
+            'subtotal' => 300,
+            'discount_total' => 0,
+            'tax_total' => 0,
+            'total' => 300,
+            'paid_total' => 100,
+            'amount_due' => 200,
+            'due_date' => now()->addWeek()->toDateString(),
+            'change_total' => 0,
+            'completed_at' => now(),
+        ]);
+        $payload = [
+            'idempotency_key' => (string) Str::uuid(),
+            'method' => 'mpesa',
+            'amount' => 50,
+            'reference' => 'MPESA-001',
+        ];
+
+        $this->actingAs($this->owner)
+            ->withSession($this->context())
+            ->post(route('receivables.payments.store', $sale), $payload)
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($this->owner)
+            ->withSession($this->context())
+            ->post(route('receivables.payments.store', $sale), $payload)
+            ->assertSessionHasNoErrors();
+
+        $sale->refresh();
+        $this->assertSame('150.00', $sale->paid_total);
+        $this->assertSame('150.00', $sale->amount_due);
+        $this->assertDatabaseCount('payments', 1);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'receivable.payment_recorded',
+            'subject_id' => $sale->id,
         ]);
     }
 

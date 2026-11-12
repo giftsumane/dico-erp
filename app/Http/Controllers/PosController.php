@@ -10,6 +10,7 @@ use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\Stock;
 use App\Services\StockService;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -184,7 +185,8 @@ class PosController extends Controller
 
     public function complete(
         Request $request,
-        StockService $stockService
+        StockService $stockService,
+        AuditService $auditService
     ) {
         $company = app('activeCompany');
         $store = app('activeStore');
@@ -236,6 +238,11 @@ class PosController extends Controller
         */
 
         $data = $request->validate([
+            'idempotency_key' => [
+                'required',
+                'uuid',
+            ],
+
             'customer_id' => [
                 'nullable',
                 'integer',
@@ -378,8 +385,32 @@ class PosController extends Controller
                 $store,
                 $customerId,
                 $stockService,
+                $auditService,
                 $cashRegister
             ) {
+                $lockedRegister = CashRegister::query()
+                    ->whereKey($cashRegister->id)
+                    ->where('company_id', $company->id)
+                    ->where('store_id', $store->id)
+                    ->where('user_id', auth()->id())
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                if ($lockedRegister->status !== 'open') {
+                    throw ValidationException::withMessages([
+                        'cash_register' => 'O caixa foi fechado. Abra um caixa para continuar.',
+                    ]);
+                }
+
+                $existingSale = Sale::query()
+                    ->where('company_id', $company->id)
+                    ->where('idempotency_key', $data['idempotency_key'])
+                    ->first();
+
+                if ($existingSale) {
+                    return $existingSale;
+                }
+
                 /*
                 |--------------------------------------------------------------------------
                 | Preparar produtos
@@ -1217,7 +1248,7 @@ class PosController extends Controller
 
                 $sale = Sale::create([
                     'cash_register_id' =>
-                        $cashRegister->id,
+                        $lockedRegister->id,
 
                     'company_id' =>
                         $company->id,
@@ -1230,6 +1261,9 @@ class PosController extends Controller
 
                     'user_id' =>
                         auth()->id(),
+
+                    'idempotency_key' =>
+                        $data['idempotency_key'],
 
                     'number' =>
                         null,
@@ -1421,10 +1455,13 @@ class PosController extends Controller
                             $sale->id,
 
                         'cash_register_id' =>
-                            $cashRegister->id,
+                            $lockedRegister->id,
 
                         'user_id' =>
                             auth()->id(),
+
+                        'idempotency_key' =>
+                            $data['idempotency_key'],
 
                         'method' =>
                             $paymentMethod,
@@ -1454,6 +1491,13 @@ class PosController extends Controller
 
                     'completed_at' =>
                         now(),
+                ]);
+
+                $auditService->record('sale.completed', $sale, [
+                    'number' => $sale->number,
+                    'total' => (float) $sale->total,
+                    'paid_total' => (float) $sale->paid_total,
+                    'payment_status' => $sale->payment_status,
                 ]);
 
                 return $sale;

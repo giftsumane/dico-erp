@@ -11,6 +11,7 @@ class Sale extends Model
         'store_id',
         'customer_id',
         'user_id',
+        'idempotency_key',
         'number',
         'status',
         'subtotal',

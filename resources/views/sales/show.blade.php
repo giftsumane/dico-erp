@@ -1427,6 +1427,7 @@
         >
 
             @csrf
+            <input type="hidden" name="idempotency_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
 
 
             <div class="sale-return-modal-body">

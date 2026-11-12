@@ -6,6 +6,7 @@ use App\Models\CashMovement;
 use App\Models\CashRegister;
 use App\Models\Payment;
 use App\Models\User;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -146,7 +147,7 @@ class CashRegisterController extends Controller
         );
     }
 
-    public function open(Request $request)
+    public function open(Request $request, AuditService $auditService)
     {
         $company = app('activeCompany');
         $store = app('activeStore');
@@ -167,7 +168,7 @@ class CashRegisterController extends Controller
             ],
         ]);
 
-        DB::transaction(function () use ($company, $store, $data) {
+        DB::transaction(function () use ($company, $store, $data, $auditService) {
             // Serializa aberturas do mesmo operador para impedir dois
             // caixas abertos por submissões simultâneas.
             User::query()
@@ -188,7 +189,7 @@ class CashRegisterController extends Controller
                 ]);
             }
 
-            CashRegister::create([
+            $cashRegister = CashRegister::create([
                 'company_id' => $company->id,
                 'store_id' => $store->id,
                 'user_id' => auth()->id(),
@@ -196,6 +197,10 @@ class CashRegisterController extends Controller
                 'opening_amount' => $data['opening_amount'],
                 'opening_notes' => $data['opening_notes'] ?? null,
                 'opened_at' => now(),
+            ]);
+
+            $auditService->record('cash_register.opened', $cashRegister, [
+                'opening_amount' => (float) $cashRegister->opening_amount,
             ]);
         });
 
@@ -207,7 +212,8 @@ class CashRegisterController extends Controller
 
     public function movement(
         Request $request,
-        CashRegister $cashRegister
+        CashRegister $cashRegister,
+        AuditService $auditService
     ) {
         $this->ensureAccess($cashRegister);
 
@@ -236,7 +242,7 @@ class CashRegisterController extends Controller
             ],
         ]);
 
-        DB::transaction(function () use ($cashRegister, $data) {
+        DB::transaction(function () use ($cashRegister, $data, $auditService) {
             $lockedRegister = CashRegister::query()
                 ->whereKey($cashRegister->id)
                 ->lockForUpdate()
@@ -246,13 +252,20 @@ class CashRegisterController extends Controller
                 abort(422, 'Este caixa já está fechado.');
             }
 
-            CashMovement::create([
+            $movement = CashMovement::create([
                 'cash_register_id' => $lockedRegister->id,
                 'user_id' => auth()->id(),
                 'type' => $data['type'],
                 'amount' => $data['amount'],
                 'reason' => $data['reason'],
                 'notes' => $data['notes'] ?? null,
+            ]);
+
+            $auditService->record('cash_register.movement_created', $lockedRegister, [
+                'movement_id' => $movement->id,
+                'type' => $movement->type,
+                'amount' => (float) $movement->amount,
+                'reason' => $movement->reason,
             ]);
         });
 
@@ -264,7 +277,8 @@ class CashRegisterController extends Controller
 
     public function close(
         Request $request,
-        CashRegister $cashRegister
+        CashRegister $cashRegister,
+        AuditService $auditService
     ) {
         $this->ensureAccess($cashRegister);
 
@@ -284,7 +298,8 @@ class CashRegisterController extends Controller
 
         DB::transaction(function () use (
             $cashRegister,
-            $data
+            $data,
+            $auditService
         ) {
             $lockedRegister = CashRegister::query()
                 ->whereKey($cashRegister->id)
@@ -348,6 +363,13 @@ class CashRegisterController extends Controller
                 'closing_notes' =>
                     $data['closing_notes'] ?? null,
                 'closed_at' => now(),
+            ]);
+
+            $auditService->record('cash_register.closed', $lockedRegister, [
+                'expected_amount' => $expected,
+                'closing_amount' => $closing,
+                'difference' => $closing - $expected,
+                'justification' => $data['closing_notes'] ?? null,
             ]);
         });
 

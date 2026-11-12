@@ -23,6 +23,7 @@ class SaleReturn extends Model
         'store_id',
         'sale_id',
         'user_id',
+        'idempotency_key',
         'cash_register_id',
         'number',
         'status',

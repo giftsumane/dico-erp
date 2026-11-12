@@ -9,6 +9,7 @@ use App\Models\SaleItem;
 use App\Models\SaleReturn;
 use App\Models\SaleReturnItem;
 use App\Services\StockService;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -24,7 +25,8 @@ class SaleReturnController extends Controller
     public function store(
         Request $request,
         Sale $sale,
-        StockService $stockService
+        StockService $stockService,
+        AuditService $auditService
     ) {
         $company = app('activeCompany');
         $store = app('activeStore');
@@ -43,6 +45,11 @@ class SaleReturnController extends Controller
         */
 
         $data = $request->validate([
+            'idempotency_key' => [
+                'required',
+                'uuid',
+            ],
+
             'items' => [
                 'required',
                 'array',
@@ -89,6 +96,17 @@ class SaleReturnController extends Controller
                 'max:2000',
             ],
         ]);
+
+        $existingReturn = SaleReturn::query()
+            ->where('sale_id', $sale->id)
+            ->where('idempotency_key', $data['idempotency_key'])
+            ->first();
+
+        if ($existingReturn) {
+            return redirect()
+                ->route('returns.show', $existingReturn)
+                ->with('success', 'Esta devolução já tinha sido registada.');
+        }
 
         $refundMethod =
             $data['refund_method'];
@@ -139,7 +157,8 @@ class SaleReturnController extends Controller
                 $data,
                 $refundMethod,
                 $refundAmount,
-                $stockService
+                $stockService,
+                $auditService
             ) {
                 /*
                 |--------------------------------------------------------------------------
@@ -159,6 +178,15 @@ class SaleReturnController extends Controller
                         !== (int) $store->id
                 ) {
                     abort(403);
+                }
+
+                $existingReturn = SaleReturn::query()
+                    ->where('sale_id', $lockedSale->id)
+                    ->where('idempotency_key', $data['idempotency_key'])
+                    ->first();
+
+                if ($existingReturn) {
+                    return $existingReturn;
                 }
 
                 if (
@@ -488,6 +516,9 @@ class SaleReturnController extends Controller
                         'user_id' =>
                             auth()->id(),
 
+                        'idempotency_key' =>
+                            $data['idempotency_key'],
+
                         'cash_register_id' =>
                             null,
 
@@ -694,6 +725,14 @@ class SaleReturnController extends Controller
                             $cashRegister->id,
                     ]);
                 }
+
+                $auditService->record('sale.return_completed', $saleReturn, [
+                    'number' => $saleReturn->number,
+                    'sale_id' => $lockedSale->id,
+                    'total' => (float) $saleReturn->total,
+                    'refund_method' => $saleReturn->refund_method,
+                    'refund_amount' => (float) $saleReturn->refund_amount,
+                ]);
 
                 return $saleReturn;
             }
