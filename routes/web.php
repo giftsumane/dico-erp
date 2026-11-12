@@ -178,7 +178,9 @@ Route::middleware([
             Route::post(
                 '/cash-registers/{cashRegister}/movements',
                 [CashRegisterController::class, 'movement']
-            )->name('cash-registers.movements.store');
+            )
+                ->middleware('role:owner,admin,manager')
+                ->name('cash-registers.movements.store');
 
 
             Route::post(
@@ -223,7 +225,9 @@ Route::middleware([
             Route::post(
                 '/sales/{sale}/returns',
                 [SaleReturnController::class, 'store']
-            )->name('sales.returns.store');
+            )
+                ->middleware('role:owner,admin,manager')
+                ->name('sales.returns.store');
 
         });
 

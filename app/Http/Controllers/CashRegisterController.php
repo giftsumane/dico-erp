@@ -330,6 +330,16 @@ class CashRegisterController extends Controller
 
             $closing = (float) $data['closing_amount'];
 
+            if (
+                abs($closing - $expected) >= 0.01
+                && blank($data['closing_notes'] ?? null)
+            ) {
+                throw ValidationException::withMessages([
+                    'closing_notes' =>
+                        'Justifique a diferença entre o valor contado e o saldo esperado.',
+                ]);
+            }
+
             $lockedRegister->update([
                 'status' => 'closed',
                 'closing_amount' => $closing,

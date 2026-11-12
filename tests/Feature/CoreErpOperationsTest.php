@@ -170,6 +170,69 @@ class CoreErpOperationsTest extends TestCase
         $this->assertSame('open', $register->fresh()->status);
     }
 
+    public function test_cashier_cannot_create_manual_cash_movement(): void
+    {
+        $cashier = User::factory()->create(['status' => 'active']);
+        $this->company->users()->attach($cashier->id, [
+            'is_owner' => false,
+            'role' => 'cashier',
+            'status' => 'active',
+        ]);
+        $this->store->users()->attach($cashier->id, ['status' => 'active']);
+        $register = CashRegister::create([
+            'company_id' => $this->company->id,
+            'store_id' => $this->store->id,
+            'user_id' => $cashier->id,
+            'status' => 'open',
+            'opening_amount' => 100,
+            'opened_at' => now(),
+        ]);
+
+        $this->actingAs($cashier)
+            ->withSession($this->context())
+            ->post(route('cash-registers.movements.store', $register), [
+                'type' => 'out',
+                'amount' => 10,
+                'reason' => 'Retirada',
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseCount('cash_movements', 0);
+    }
+
+    public function test_cash_difference_requires_justification(): void
+    {
+        $register = CashRegister::create([
+            'company_id' => $this->company->id,
+            'store_id' => $this->store->id,
+            'user_id' => $this->owner->id,
+            'status' => 'open',
+            'opening_amount' => 100,
+            'opened_at' => now(),
+        ]);
+
+        $this->actingAs($this->owner)
+            ->withSession($this->context())
+            ->post(route('cash-registers.close', $register), [
+                'closing_amount' => 90,
+            ])
+            ->assertSessionHasErrors('closing_notes');
+
+        $this->assertSame('open', $register->fresh()->status);
+
+        $this->actingAs($this->owner)
+            ->withSession($this->context())
+            ->post(route('cash-registers.close', $register), [
+                'closing_amount' => 90,
+                'closing_notes' => 'Falta de numerário confirmada na contagem.',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $register->refresh();
+        $this->assertSame('closed', $register->status);
+        $this->assertSame('-10.00', $register->difference);
+    }
+
     public function test_stock_service_rejects_product_from_another_company(): void
     {
         $otherCompany = Company::create(['name' => 'Outra', 'status' => 'active']);
