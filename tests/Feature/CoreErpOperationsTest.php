@@ -561,6 +561,33 @@ class CoreErpOperationsTest extends TestCase
         $log->update(['action' => 'tampered']);
     }
 
+    public function test_owner_can_create_an_isolated_company_with_main_store(): void
+    {
+        $response = $this->actingAs($this->owner)
+            ->withSession($this->context())
+            ->post(route('companies.store'), [
+                'name' => 'Segunda Empresa',
+                'business_type' => 'retail',
+                'store_name' => 'Loja Central',
+                'store_code' => 'LC',
+            ]);
+
+        $company = Company::query()->where('name', 'Segunda Empresa')->firstOrFail();
+        $store = $company->stores()->firstOrFail();
+        $response->assertRedirect(route('dashboard'));
+        $this->assertTrue($company->users()->whereKey($this->owner->id)->exists());
+        $this->assertTrue($store->users()->whereKey($this->owner->id)->exists());
+        $this->assertTrue($store->is_main);
+        $this->assertTrue($company->hasFeature('pos'));
+        $this->assertSame($company->id, session('active_company_id'));
+        $this->assertSame($store->id, session('active_store_id'));
+        $this->assertDatabaseHas('audit_logs', [
+            'company_id' => $company->id,
+            'action' => 'company.created',
+            'subject_id' => $company->id,
+        ]);
+    }
+
     private function product(array $overrides = []): Product
     {
         return Product::create(array_merge([

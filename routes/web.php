@@ -32,6 +32,7 @@ use App\Http\Controllers\BarStockOrderController;
 use App\Http\Controllers\EventOperationsDashboardController;
 use App\Http\Controllers\EventWarehouseController;
 use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\CompanyController;
 
 /*
 |--------------------------------------------------------------------------
@@ -822,6 +823,15 @@ Route::middleware([
     Route::middleware(
         'role:owner,admin'
     )->group(function () {
+
+        Route::middleware('role:owner')->group(function () {
+            Route::get('/companies', [CompanyController::class, 'index'])
+                ->name('companies.index');
+            Route::get('/companies/create', [CompanyController::class, 'create'])
+                ->name('companies.create');
+            Route::post('/companies', [CompanyController::class, 'store'])
+                ->name('companies.store');
+        });
 
         Route::get('/audit-logs', [AuditLogController::class, 'index'])
             ->name('audit-logs.index');

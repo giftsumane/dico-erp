@@ -1630,6 +1630,16 @@
 
             <nav class="sidebar-menu">
 
+                @if ($activeRole === 'owner')
+                    <a
+                        href="{{ route('companies.index') }}"
+                        class="sidebar-link {{ request()->routeIs('companies.*') ? 'active' : '' }}"
+                    >
+                        <span class="sidebar-icon">◉</span>
+                        Empresas
+                    </a>
+                @endif
+
                 {{-- Lojas - CORE --}}
 
                 <a
