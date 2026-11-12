@@ -588,6 +588,59 @@ class CoreErpOperationsTest extends TestCase
         ]);
     }
 
+    public function test_core_records_from_another_company_are_forbidden(): void
+    {
+        $otherCompany = Company::create(['name' => 'Empresa Privada', 'status' => 'active']);
+        $otherStore = Store::create([
+            'company_id' => $otherCompany->id,
+            'name' => 'Loja Privada',
+            'code' => 'PRIV',
+            'status' => 'active',
+        ]);
+        $otherProduct = Product::create([
+            'company_id' => $otherCompany->id,
+            'product_type' => Product::TYPE_SIMPLE,
+            'inventory_mode' => Product::INVENTORY_SIMPLE,
+            'name' => 'Produto Privado',
+            'purchase_price' => 10,
+            'sale_price' => 20,
+            'minimum_stock' => 0,
+            'track_stock' => true,
+            'active' => true,
+        ]);
+        $otherPurchase = Purchase::create([
+            'company_id' => $otherCompany->id,
+            'store_id' => $otherStore->id,
+            'number' => 'CMP-PRIV',
+            'purchase_date' => now()->toDateString(),
+            'status' => 'draft',
+            'subtotal' => 0,
+            'tax_total' => 0,
+            'total' => 0,
+        ]);
+        $otherSale = Sale::create([
+            'company_id' => $otherCompany->id,
+            'store_id' => $otherStore->id,
+            'number' => 'VND-PRIV',
+            'status' => 'completed',
+            'payment_status' => 'paid',
+            'subtotal' => 20,
+            'discount_total' => 0,
+            'tax_total' => 0,
+            'total' => 20,
+            'paid_total' => 20,
+            'amount_due' => 0,
+            'change_total' => 0,
+            'completed_at' => now(),
+        ]);
+
+        $client = $this->actingAs($this->owner)->withSession($this->context());
+        $client->get(route('products.edit', $otherProduct))->assertForbidden();
+        $client->get(route('purchases.show', $otherPurchase))->assertForbidden();
+        $client->get(route('sales.show', $otherSale))->assertForbidden();
+        $client->get(route('pos.receipt', $otherSale))->assertForbidden();
+    }
+
     private function product(array $overrides = []): Product
     {
         return Product::create(array_merge([
