@@ -232,6 +232,14 @@ Route::middleware([
 
         });
 
+        Route::get('/reports/stock/export', [ReportController::class, 'stockExport'])
+            ->middleware('feature:inventory')
+            ->name('reports.stock.export');
+
+        Route::get('/reports/cash/export', [ReportController::class, 'cashExport'])
+            ->middleware('feature:pos')
+            ->name('reports.cash.export');
+
 
         /*
         |--------------------------------------------------------------------------

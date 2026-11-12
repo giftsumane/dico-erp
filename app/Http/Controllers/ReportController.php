@@ -5,6 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Payment;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Models\Stock;
+use App\Models\CashRegister;
+use App\Models\CashMovement;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +15,127 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportController extends Controller
 {
+    public function stockExport(): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $company = app('activeCompany');
+        $store = app('activeStore');
+        abort_unless($store, 403);
+
+        $stocks = Stock::query()
+            ->with(['product.category', 'product.unit'])
+            ->where('company_id', $company->id)
+            ->where('store_id', $store->id)
+            ->orderBy('product_id')
+            ->cursor();
+
+        return response()->streamDownload(function () use ($stocks) {
+            $output = fopen('php://output', 'w');
+            fwrite($output, "\xEF\xBB\xBF");
+            fputcsv($output, [
+                'Produto', 'SKU', 'Categoria', 'Unidade', 'Quantidade',
+                'Stock mínimo', 'Custo unitário', 'Valor em stock', 'Situação',
+            ], ';');
+
+            foreach ($stocks as $stock) {
+                $product = $stock->product;
+                $quantity = (float) $stock->quantity;
+                $minimum = (float) $product->minimum_stock;
+                fputcsv($output, [
+                    $product->name,
+                    $product->sku,
+                    $product->category?->name,
+                    $product->unit?->symbol ?? $product->unit?->name,
+                    $quantity,
+                    $minimum,
+                    $product->purchase_price,
+                    round($quantity * (float) $product->purchase_price, 2),
+                    $quantity <= $minimum ? 'Baixo' : 'Normal',
+                ], ';');
+            }
+
+            fclose($output);
+        }, 'stock-' . now()->format('Ymd-His') . '.csv', [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    public function cashExport(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $company = app('activeCompany');
+        $store = app('activeStore');
+        abort_unless($store, 403);
+
+        $data = $request->validate([
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+        ]);
+
+        $registers = CashRegister::query()
+            ->with('user')
+            ->where('company_id', $company->id)
+            ->where('store_id', $store->id)
+            ->when($data['date_from'] ?? null, fn ($query, $date) =>
+                $query->whereDate('opened_at', '>=', $date)
+            )
+            ->when($data['date_to'] ?? null, fn ($query, $date) =>
+                $query->whereDate('opened_at', '<=', $date)
+            )
+            ->oldest('opened_at')
+            ->cursor();
+
+        return response()->streamDownload(function () use ($registers) {
+            $output = fopen('php://output', 'w');
+            fwrite($output, "\xEF\xBB\xBF");
+            fputcsv($output, [
+                'Operador', 'Abertura', 'Fecho', 'Estado', 'Fundo inicial',
+                'Dinheiro recebido', 'M-Pesa', 'e-Mola', 'Cartão',
+                'Transferência', 'Outros', 'Entradas manuais', 'Saídas manuais',
+                'Esperado', 'Contado', 'Diferença', 'Justificação',
+            ], ';');
+
+            foreach ($registers as $register) {
+                $payments = Payment::query()
+                    ->where('cash_register_id', $register->id)
+                    ->select('method', DB::raw('SUM(amount) as total'))
+                    ->groupBy('method')
+                    ->pluck('total', 'method');
+                $manualIn = CashMovement::query()
+                    ->where('cash_register_id', $register->id)
+                    ->where('type', 'in')->sum('amount');
+                $manualOut = CashMovement::query()
+                    ->where('cash_register_id', $register->id)
+                    ->where('type', 'out')->sum('amount');
+                $expected = (float) $register->opening_amount
+                    + (float) ($payments['cash'] ?? 0)
+                    + (float) $manualIn - (float) $manualOut;
+
+                fputcsv($output, [
+                    $register->user?->name,
+                    $register->opened_at?->format('Y-m-d H:i:s'),
+                    $register->closed_at?->format('Y-m-d H:i:s'),
+                    $register->status,
+                    $register->opening_amount,
+                    $payments['cash'] ?? 0,
+                    $payments['mpesa'] ?? 0,
+                    $payments['emola'] ?? 0,
+                    $payments['card'] ?? 0,
+                    $payments['bank_transfer'] ?? 0,
+                    $payments['other'] ?? 0,
+                    $manualIn,
+                    $manualOut,
+                    $register->expected_amount ?? $expected,
+                    $register->closing_amount,
+                    $register->difference,
+                    $register->closing_notes,
+                ], ';');
+            }
+
+            fclose($output);
+        }, 'caixas-' . now()->format('Ymd-His') . '.csv', [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
     public function export(Request $request): StreamedResponse
     {
         $company = app('activeCompany');

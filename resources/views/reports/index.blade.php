@@ -83,6 +83,18 @@
                 Exportar CSV
             </a>
 
+            @if ($activeCompany->hasFeature('inventory'))
+                <a href="{{ route('reports.stock.export') }}" class="topbar-button">
+                    Exportar stock
+                </a>
+            @endif
+
+            @if ($activeCompany->hasFeature('pos'))
+                <a href="{{ route('reports.cash.export') }}" class="topbar-button">
+                    Exportar caixas
+                </a>
+            @endif
+
             <a
                 href="{{ route('receivables.index') }}"
                 class="topbar-button"

@@ -100,6 +100,12 @@ class CoreErpOperationsTest extends TestCase
 
         $this->actingAs($this->owner)
             ->withSession($this->context())
+            ->get(route('reports.stock.export'))
+            ->assertOk()
+            ->assertDownload();
+
+        $this->actingAs($this->owner)
+            ->withSession($this->context())
             ->post(route('purchases.confirm', $purchase))
             ->assertSessionHasErrors('purchase');
 
@@ -289,6 +295,12 @@ class CoreErpOperationsTest extends TestCase
             ->assertOk()
             ->assertSee('Reconciliação por método')
             ->assertSee('200,00');
+
+        $this->actingAs($this->owner)
+            ->withSession($this->context())
+            ->get(route('reports.cash.export'))
+            ->assertOk()
+            ->assertDownload();
     }
 
     public function test_operator_cannot_modify_another_operators_cash_register(): void
