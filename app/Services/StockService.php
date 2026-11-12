@@ -34,6 +34,8 @@ class StockService
         ?string $referenceType = null,
         ?int $referenceId = null
     ): Stock {
+        $this->validateStockContext($product, $store);
+
         if ($quantity <= 0) {
             throw ValidationException::withMessages([
                 'quantity' => 'A quantidade deve ser superior a zero.',
@@ -100,6 +102,8 @@ class StockService
         ?string $referenceType = null,
         ?int $referenceId = null
     ): Stock {
+        $this->validateStockContext($product, $store);
+
         if ($quantity <= 0) {
             throw ValidationException::withMessages([
                 'quantity' => 'A quantidade deve ser superior a zero.',
@@ -117,6 +121,7 @@ class StockService
             $referenceId
         ) {
             $stock = Stock::query()
+                ->where('company_id', $product->company_id)
                 ->where('store_id', $store->id)
                 ->where('product_id', $product->id)
                 ->lockForUpdate()
@@ -178,6 +183,7 @@ class StockService
         ?string $referenceType = null,
         ?int $referenceId = null
     ): StockBatch {
+        $this->validateStockContext($product, $store);
     
         if ($quantity <= 0) {
             throw ValidationException::withMessages([
@@ -460,6 +466,7 @@ class StockService
             }
 
             $stock = Stock::query()
+                ->where('company_id', $product->company_id)
                 ->where('store_id', $store->id)
                 ->where('product_id', $product->id)
                 ->lockForUpdate()
@@ -1172,6 +1179,7 @@ class StockService
         Store $store
     ): Stock {
         $stock = Stock::query()
+            ->where('company_id', $product->company_id)
             ->where('store_id', $store->id)
             ->where('product_id', $product->id)
             ->lockForUpdate()
@@ -1199,6 +1207,7 @@ class StockService
         ]);
 
         return Stock::query()
+            ->where('company_id', $product->company_id)
             ->where('store_id', $store->id)
             ->where('product_id', $product->id)
             ->lockForUpdate()
@@ -1216,6 +1225,8 @@ class StockService
         Store $store,
         StockBatch $batch
     ): void {
+        $this->validateStockContext($product, $store);
+
         if (
             (int) $batch->company_id
                 !== (int) $product->company_id
@@ -1227,6 +1238,18 @@ class StockService
             throw ValidationException::withMessages([
                 'batch' =>
                     'O lote seleccionado não pertence a este produto e loja.',
+            ]);
+        }
+    }
+
+    private function validateStockContext(
+        Product $product,
+        Store $store
+    ): void {
+        if ((int) $product->company_id !== (int) $store->company_id) {
+            throw ValidationException::withMessages([
+                'store_id' =>
+                    'O produto e a loja devem pertencer à mesma empresa.',
             ]);
         }
     }

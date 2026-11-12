@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\CashMovement;
 use App\Models\CashRegister;
 use App\Models\Payment;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -166,28 +167,37 @@ class CashRegisterController extends Controller
             ],
         ]);
 
-        $alreadyOpen = CashRegister::query()
-            ->where('company_id', $company->id)
-            ->where('store_id', $store->id)
-            ->where('user_id', auth()->id())
-            ->where('status', 'open')
-            ->exists();
+        DB::transaction(function () use ($company, $store, $data) {
+            // Serializa aberturas do mesmo operador para impedir dois
+            // caixas abertos por submissões simultâneas.
+            User::query()
+                ->whereKey(auth()->id())
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        if ($alreadyOpen) {
-            throw ValidationException::withMessages([
-                'opening_amount' => 'Já tens um caixa aberto nesta loja.',
+            $alreadyOpen = CashRegister::query()
+                ->where('company_id', $company->id)
+                ->where('store_id', $store->id)
+                ->where('user_id', auth()->id())
+                ->where('status', 'open')
+                ->exists();
+
+            if ($alreadyOpen) {
+                throw ValidationException::withMessages([
+                    'opening_amount' => 'Já tens um caixa aberto nesta loja.',
+                ]);
+            }
+
+            CashRegister::create([
+                'company_id' => $company->id,
+                'store_id' => $store->id,
+                'user_id' => auth()->id(),
+                'status' => 'open',
+                'opening_amount' => $data['opening_amount'],
+                'opening_notes' => $data['opening_notes'] ?? null,
+                'opened_at' => now(),
             ]);
-        }
-
-        CashRegister::create([
-            'company_id' => $company->id,
-            'store_id' => $store->id,
-            'user_id' => auth()->id(),
-            'status' => 'open',
-            'opening_amount' => $data['opening_amount'],
-            'opening_notes' => $data['opening_notes'] ?? null,
-            'opened_at' => now(),
-        ]);
+        });
 
         return back()->with(
             'success',
@@ -200,10 +210,6 @@ class CashRegisterController extends Controller
         CashRegister $cashRegister
     ) {
         $this->ensureAccess($cashRegister);
-
-        if ($cashRegister->status !== 'open') {
-            abort(422, 'Este caixa já está fechado.');
-        }
 
         $data = $request->validate([
             'type' => [
@@ -230,14 +236,25 @@ class CashRegisterController extends Controller
             ],
         ]);
 
-        CashMovement::create([
-            'cash_register_id' => $cashRegister->id,
-            'user_id' => auth()->id(),
-            'type' => $data['type'],
-            'amount' => $data['amount'],
-            'reason' => $data['reason'],
-            'notes' => $data['notes'] ?? null,
-        ]);
+        DB::transaction(function () use ($cashRegister, $data) {
+            $lockedRegister = CashRegister::query()
+                ->whereKey($cashRegister->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedRegister->status !== 'open') {
+                abort(422, 'Este caixa já está fechado.');
+            }
+
+            CashMovement::create([
+                'cash_register_id' => $lockedRegister->id,
+                'user_id' => auth()->id(),
+                'type' => $data['type'],
+                'amount' => $data['amount'],
+                'reason' => $data['reason'],
+                'notes' => $data['notes'] ?? null,
+            ]);
+        });
 
         return back()->with(
             'success',
@@ -250,10 +267,6 @@ class CashRegisterController extends Controller
         CashRegister $cashRegister
     ) {
         $this->ensureAccess($cashRegister);
-
-        if ($cashRegister->status !== 'open') {
-            abort(422, 'Este caixa já está fechado.');
-        }
 
         $data = $request->validate([
             'closing_amount' => [
@@ -273,12 +286,19 @@ class CashRegisterController extends Controller
             $cashRegister,
             $data
         ) {
-            $cashRegister->refresh();
+            $lockedRegister = CashRegister::query()
+                ->whereKey($cashRegister->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedRegister->status !== 'open') {
+                abort(422, 'Este caixa já está fechado.');
+            }
 
             $cashSales = Payment::query()
             ->where(
                 'cash_register_id',
-                $cashRegister->id
+                $lockedRegister->id
             )
             ->where(
                 'method',
@@ -289,7 +309,7 @@ class CashRegisterController extends Controller
             $manualIn = CashMovement::query()
                 ->where(
                     'cash_register_id',
-                    $cashRegister->id
+                    $lockedRegister->id
                 )
                 ->where('type', 'in')
                 ->sum('amount');
@@ -297,20 +317,20 @@ class CashRegisterController extends Controller
             $manualOut = CashMovement::query()
                 ->where(
                     'cash_register_id',
-                    $cashRegister->id
+                    $lockedRegister->id
                 )
                 ->where('type', 'out')
                 ->sum('amount');
 
             $expected =
-                (float) $cashRegister->opening_amount
+                (float) $lockedRegister->opening_amount
                 + (float) $cashSales
                 + (float) $manualIn
                 - (float) $manualOut;
 
             $closing = (float) $data['closing_amount'];
 
-            $cashRegister->update([
+            $lockedRegister->update([
                 'status' => 'closed',
                 'closing_amount' => $closing,
                 'expected_amount' => $expected,
@@ -336,7 +356,8 @@ class CashRegisterController extends Controller
         abort_unless(
             $store
             && $cashRegister->company_id === $company->id
-            && $cashRegister->store_id === $store->id,
+            && $cashRegister->store_id === $store->id
+            && $cashRegister->user_id === auth()->id(),
             403
         );
     }
