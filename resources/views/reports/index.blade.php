@@ -76,6 +76,12 @@
 
 
         <div class="report-heading-actions">
+            <a
+                href="{{ route('reports.export', request()->query()) }}"
+                class="topbar-button"
+            >
+                Exportar CSV
+            </a>
 
             <a
                 href="{{ route('receivables.index') }}"

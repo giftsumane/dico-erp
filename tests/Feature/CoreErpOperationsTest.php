@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\CashRegister;
+use App\Models\AuditLog;
 use App\Models\Company;
 use App\Models\Customer;
 use App\Models\Product;
@@ -163,6 +164,12 @@ class CoreErpOperationsTest extends TestCase
             'action' => 'sale.completed',
             'subject_id' => $sale->id,
         ]);
+
+        $this->actingAs($this->owner)
+            ->withSession($this->context())
+            ->get(route('reports.export', ['period' => 'today']))
+            ->assertOk()
+            ->assertDownload();
     }
 
     public function test_receivable_payment_is_idempotent_and_audited(): void
@@ -325,6 +332,47 @@ class CoreErpOperationsTest extends TestCase
 
         $this->expectException(ValidationException::class);
         app(StockService::class)->add($foreignProduct, $this->store, 1);
+    }
+
+    public function test_audit_trail_is_admin_only_exportable_and_immutable(): void
+    {
+        $log = AuditLog::create([
+            'company_id' => $this->company->id,
+            'store_id' => $this->store->id,
+            'user_id' => $this->owner->id,
+            'action' => 'test.operation',
+            'subject_type' => Sale::class,
+            'subject_id' => 99,
+            'metadata' => ['reference' => 'TEST-99'],
+        ]);
+
+        $this->actingAs($this->owner)
+            ->withSession($this->context())
+            ->get(route('audit-logs.index'))
+            ->assertOk()
+            ->assertSee('test.operation');
+
+        $this->actingAs($this->owner)
+            ->withSession($this->context())
+            ->get(route('audit-logs.export'))
+            ->assertOk()
+            ->assertDownload();
+
+        $cashier = User::factory()->create(['status' => 'active']);
+        $this->company->users()->attach($cashier->id, [
+            'is_owner' => false,
+            'role' => 'cashier',
+            'status' => 'active',
+        ]);
+        $this->store->users()->attach($cashier->id, ['status' => 'active']);
+
+        $this->actingAs($cashier)
+            ->withSession($this->context())
+            ->get(route('audit-logs.index'))
+            ->assertForbidden();
+
+        $this->expectException(\LogicException::class);
+        $log->update(['action' => 'tampered']);
     }
 
     private function product(array $overrides = []): Product

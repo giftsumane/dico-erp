@@ -1685,6 +1685,15 @@
                 {{-- Configurações da empresa --}}
 
                 <a
+                    href="{{ route('audit-logs.index') }}"
+                    class="sidebar-link {{ request()->routeIs('audit-logs.*') ? 'active' : '' }}"
+                >
+                    <span class="sidebar-icon">≣</span>
+                    Auditoria
+                </a>
+
+
+                <a
                     href="{{ route(
                         'settings.company.edit'
                     ) }}"

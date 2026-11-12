@@ -31,6 +31,7 @@ use App\Http\Controllers\EventOperationController;
 use App\Http\Controllers\BarStockOrderController;
 use App\Http\Controllers\EventOperationsDashboardController;
 use App\Http\Controllers\EventWarehouseController;
+use App\Http\Controllers\AuditLogController;
 
 /*
 |--------------------------------------------------------------------------
@@ -767,6 +768,11 @@ Route::middleware([
                 [ReportController::class, 'index']
             )->name('reports.index');
 
+            Route::get(
+                '/reports/export',
+                [ReportController::class, 'export']
+            )->name('reports.export');
+
         });
 
         /*
@@ -808,6 +814,12 @@ Route::middleware([
     Route::middleware(
         'role:owner,admin'
     )->group(function () {
+
+        Route::get('/audit-logs', [AuditLogController::class, 'index'])
+            ->name('audit-logs.index');
+
+        Route::get('/audit-logs/export', [AuditLogController::class, 'export'])
+            ->name('audit-logs.export');
 
 
         /*

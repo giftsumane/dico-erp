@@ -8,9 +8,60 @@ use App\Models\SaleItem;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportController extends Controller
 {
+    public function export(Request $request): StreamedResponse
+    {
+        $company = app('activeCompany');
+        $store = app('activeStore');
+        abort_unless($store, 403);
+
+        [$dateFrom, $dateTo] = $this->exportPeriod($request);
+
+        $sales = Sale::query()
+            ->with(['customer', 'user', 'payments'])
+            ->where('company_id', $company->id)
+            ->where('store_id', $store->id)
+            ->where('status', 'completed')
+            ->whereBetween('completed_at', [$dateFrom, $dateTo])
+            ->oldest('completed_at')
+            ->cursor();
+
+        $filename = 'vendas-' . $dateFrom->format('Ymd')
+            . '-' . $dateTo->format('Ymd') . '.csv';
+
+        return response()->streamDownload(function () use ($sales) {
+            $output = fopen('php://output', 'w');
+            fwrite($output, "\xEF\xBB\xBF");
+            fputcsv($output, [
+                'Número', 'Data', 'Cliente', 'Operador', 'Subtotal',
+                'Desconto', 'IVA', 'Total', 'Pago', 'Saldo',
+                'Estado do pagamento', 'Métodos',
+            ], ';');
+
+            foreach ($sales as $sale) {
+                fputcsv($output, [
+                    $sale->number,
+                    $sale->completed_at?->format('Y-m-d H:i:s'),
+                    $sale->customer?->name,
+                    $sale->user?->name,
+                    $sale->subtotal,
+                    $sale->discount_total,
+                    $sale->tax_total,
+                    $sale->total,
+                    $sale->paid_total,
+                    $sale->amount_due,
+                    $sale->payment_status,
+                    $sale->payments->pluck('method')->unique()->implode(', '),
+                ], ';');
+            }
+
+            fclose($output);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
     public function index(Request $request)
     {
         $company = app('activeCompany');
@@ -827,5 +878,30 @@ class ReportController extends Controller
                 'topProducts'
             )
         );
+    }
+
+    private function exportPeriod(Request $request): array
+    {
+        $period = $request->string('period', 'today')->toString();
+
+        if ($period === 'custom') {
+            $data = $request->validate([
+                'date_from' => ['required', 'date'],
+                'date_to' => ['required', 'date', 'after_or_equal:date_from'],
+            ]);
+
+            return [
+                Carbon::parse($data['date_from'])->startOfDay(),
+                Carbon::parse($data['date_to'])->endOfDay(),
+            ];
+        }
+
+        $days = match ($period) {
+            '7d' => 6,
+            '30d' => 29,
+            default => 0,
+        };
+
+        return [now()->subDays($days)->startOfDay(), now()->endOfDay()];
     }
 }
