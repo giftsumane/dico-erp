@@ -303,6 +303,113 @@ class CoreErpOperationsTest extends TestCase
             ->assertDownload();
     }
 
+    public function test_partial_return_restores_stock_only_once(): void
+    {
+        $product = $this->product(['sale_price' => 100]);
+        Stock::create([
+            'company_id' => $this->company->id,
+            'store_id' => $this->store->id,
+            'product_id' => $product->id,
+            'quantity' => 5,
+        ]);
+        CashRegister::create([
+            'company_id' => $this->company->id,
+            'store_id' => $this->store->id,
+            'user_id' => $this->owner->id,
+            'status' => 'open',
+            'opening_amount' => 0,
+            'opened_at' => now(),
+        ]);
+
+        $this->actingAs($this->owner)
+            ->withSession($this->context())
+            ->post(route('pos.complete'), [
+                'idempotency_key' => (string) Str::uuid(),
+                'payment_type' => 'full',
+                'payment_method' => 'cash',
+                'amount_received' => 200,
+                'items' => [[
+                    'product_id' => $product->id,
+                    'quantity' => 2,
+                ]],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $sale = Sale::with('items')->firstOrFail();
+        $payload = [
+            'idempotency_key' => (string) Str::uuid(),
+            'refund_method' => 'none',
+            'refund_amount' => 0,
+            'reason' => 'Produto devolvido',
+            'items' => [[
+                'sale_item_id' => $sale->items->first()->id,
+                'quantity' => 1,
+            ]],
+        ];
+
+        $this->actingAs($this->owner)
+            ->withSession($this->context())
+            ->post(route('sales.returns.store', $sale), $payload)
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($this->owner)
+            ->withSession($this->context())
+            ->post(route('sales.returns.store', $sale), $payload)
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseCount('sale_returns', 1);
+        $this->assertDatabaseCount('sale_return_items', 1);
+        $this->assertSame('4.000', Stock::firstOrFail()->quantity);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'sale.return_completed',
+        ]);
+    }
+
+    public function test_last_stock_unit_cannot_be_sold_twice(): void
+    {
+        $product = $this->product(['sale_price' => 100]);
+        Stock::create([
+            'company_id' => $this->company->id,
+            'store_id' => $this->store->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+        ]);
+        CashRegister::create([
+            'company_id' => $this->company->id,
+            'store_id' => $this->store->id,
+            'user_id' => $this->owner->id,
+            'status' => 'open',
+            'opening_amount' => 0,
+            'opened_at' => now(),
+        ]);
+        $payload = [
+            'payment_type' => 'full',
+            'payment_method' => 'cash',
+            'amount_received' => 100,
+            'items' => [[
+                'product_id' => $product->id,
+                'quantity' => 1,
+            ]],
+        ];
+
+        $this->actingAs($this->owner)
+            ->withSession($this->context())
+            ->post(route('pos.complete'), $payload + [
+                'idempotency_key' => (string) Str::uuid(),
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($this->owner)
+            ->withSession($this->context())
+            ->post(route('pos.complete'), $payload + [
+                'idempotency_key' => (string) Str::uuid(),
+            ])
+            ->assertSessionHasErrors('items');
+
+        $this->assertDatabaseCount('sales', 1);
+        $this->assertSame('0.000', Stock::firstOrFail()->quantity);
+    }
+
     public function test_operator_cannot_modify_another_operators_cash_register(): void
     {
         $other = User::factory()->create(['status' => 'active']);
