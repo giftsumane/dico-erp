@@ -294,6 +294,26 @@ class PosController extends Controller
                 'max:150',
             ],
 
+            'secondary_payment_method' => [
+                'nullable',
+                'required_with:secondary_amount_received',
+                'different:payment_method',
+                'in:cash,mpesa,emola,card,bank_transfer,other',
+            ],
+
+            'secondary_amount_received' => [
+                'nullable',
+                'required_with:secondary_payment_method',
+                'numeric',
+                'gt:0',
+            ],
+
+            'secondary_payment_reference' => [
+                'nullable',
+                'string',
+                'max:150',
+            ],
+
             'due_date' => [
                 'nullable',
                 'date',
@@ -999,9 +1019,9 @@ class PosController extends Controller
                 $paymentType =
                     $data['payment_type'];
 
-                $paymentMethod =
-                    $data['payment_method']
-                    ?? null;
+                $paymentMethod = $data['payment_method'] ?? null;
+                $secondaryPaymentMethod =
+                    $data['secondary_payment_method'] ?? null;
 
                 $amountReceived =
                     isset(
@@ -1011,6 +1031,43 @@ class PosController extends Controller
                             'amount_received'
                         ]
                         : 0;
+
+                $preparedPayments = [];
+                $isSplitPayment = $secondaryPaymentMethod !== null;
+
+                if ($paymentType === 'credit' && $isSplitPayment) {
+                    throw ValidationException::withMessages([
+                        'secondary_payment_method' =>
+                            'Uma venda totalmente a crédito não pode ter pagamentos.',
+                    ]);
+                }
+
+                if ($isSplitPayment) {
+                    if ($amountReceived <= 0) {
+                        throw ValidationException::withMessages([
+                            'amount_received' =>
+                                'Informe o valor do primeiro método de pagamento.',
+                        ]);
+                    }
+
+                    $preparedPayments = [
+                        [
+                            'method' => $paymentMethod,
+                            'amount' => round($amountReceived, 2),
+                            'reference' => $data['payment_reference'] ?? null,
+                        ],
+                        [
+                            'method' => $secondaryPaymentMethod,
+                            'amount' => round((float) $data['secondary_amount_received'], 2),
+                            'reference' => $data['secondary_payment_reference'] ?? null,
+                        ],
+                    ];
+
+                    $amountReceived = round(
+                        collect($preparedPayments)->sum('amount'),
+                        2
+                    );
+                }
 
                 /*
                 |--------------------------------------------------------------------------
@@ -1027,6 +1084,8 @@ class PosController extends Controller
                      */
 
                     if (
+                        ! $isSplitPayment
+                        &&
                         $paymentMethod
                         !== 'cash'
                     ) {
@@ -1040,6 +1099,8 @@ class PosController extends Controller
                      */
 
                     if (
+                        ! $isSplitPayment
+                        &&
                         $paymentMethod
                         === 'cash'
                         && $amountReceived <= 0
@@ -1062,6 +1123,7 @@ class PosController extends Controller
                     $amountReceived = 0;
 
                     $paymentMethod = null;
+                    $preparedPayments = [];
                 }
 
                 /*
@@ -1104,7 +1166,44 @@ class PosController extends Controller
                 $paidApplied =
                     $amountReceived;
 
-                if (
+                if ($isSplitPayment && $paymentType === 'full') {
+                    if ($amountReceived < $total) {
+                        throw ValidationException::withMessages([
+                            'secondary_amount_received' =>
+                                'A soma dos pagamentos é inferior ao total da venda.',
+                        ]);
+                    }
+
+                    $change = round($amountReceived - $total, 2);
+                    $cashIndex = collect($preparedPayments)
+                        ->search(fn (array $payment) => $payment['method'] === 'cash');
+
+                    if ($change > 0 && $cashIndex === false) {
+                        throw ValidationException::withMessages([
+                            'secondary_amount_received' =>
+                                'Pagamentos electrónicos não podem gerar troco.',
+                        ]);
+                    }
+
+                    if (
+                        $change > 0
+                        && $preparedPayments[$cashIndex]['amount'] < $change
+                    ) {
+                        throw ValidationException::withMessages([
+                            'amount_received' =>
+                                'O troco não pode ser superior ao valor pago em dinheiro.',
+                        ]);
+                    }
+
+                    if ($change > 0) {
+                        $preparedPayments[$cashIndex]['amount'] = round(
+                            $preparedPayments[$cashIndex]['amount'] - $change,
+                            2
+                        );
+                    }
+
+                    $paidApplied = $total;
+                } elseif (
                     $paymentType === 'full'
                     && $paymentMethod === 'cash'
                 ) {
@@ -1132,6 +1231,14 @@ class PosController extends Controller
                      */
                     $paidApplied =
                         $total;
+                }
+
+                if (! $isSplitPayment && $paidApplied > 0 && $paymentMethod) {
+                    $preparedPayments = [[
+                        'method' => $paymentMethod,
+                        'amount' => round($paidApplied, 2),
+                        'reference' => $data['payment_reference'] ?? null,
+                    ]];
                 }
 
                 /*
@@ -1446,10 +1553,11 @@ class PosController extends Controller
                 |--------------------------------------------------------------------------
                 */
 
-                if (
-                    $paidApplied > 0
-                    && $paymentMethod
-                ) {
+                foreach ($preparedPayments as $paymentIndex => $preparedPayment) {
+                    if ($preparedPayment['amount'] <= 0) {
+                        continue;
+                    }
+
                     Payment::create([
                         'sale_id' =>
                             $sale->id,
@@ -1461,18 +1569,18 @@ class PosController extends Controller
                             auth()->id(),
 
                         'idempotency_key' =>
-                            $data['idempotency_key'],
+                            $paymentIndex === 0
+                                ? $data['idempotency_key']
+                                : null,
 
                         'method' =>
-                            $paymentMethod,
+                            $preparedPayment['method'],
 
                         'amount' =>
-                            $paidApplied,
+                            $preparedPayment['amount'],
 
                         'reference' =>
-                            $data[
-                                'payment_reference'
-                            ] ?? null,
+                            $preparedPayment['reference'],
 
                         'paid_at' =>
                             now(),

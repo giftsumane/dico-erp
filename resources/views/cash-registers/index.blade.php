@@ -213,6 +213,30 @@
 
     </div>
 
+    <div class="panel" style="margin-top:18px">
+        <div class="panel-header">
+            <div>
+                <h2 class="panel-title">Reconciliação por método</h2>
+                <p class="panel-subtitle">Pagamentos electrónicos ficam separados do numerário esperado.</p>
+            </div>
+            <strong>{{ number_format($currentSummary['electronic_total'], 2, ',', '.') }} MT electrónicos</strong>
+        </div>
+        <div class="panel-body" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px">
+            @php
+                $methodLabels = [
+                    'cash' => 'Dinheiro', 'mpesa' => 'M-Pesa', 'emola' => 'e-Mola',
+                    'card' => 'Cartão', 'bank_transfer' => 'Transferência', 'other' => 'Outro',
+                ];
+            @endphp
+            @foreach ($methodLabels as $method => $label)
+                <div style="padding:12px;border:1px solid #e2e8f0;border-radius:10px">
+                    <div style="font-size:12px;color:var(--muted)">{{ $label }}</div>
+                    <strong>{{ number_format((float) ($currentSummary['payments_by_method'][$method] ?? 0), 2, ',', '.') }} MT</strong>
+                </div>
+            @endforeach
+        </div>
+    </div>
+
     <div class="panel" style="margin-top:22px; border:1px solid var(--primary);">
 
         <div
@@ -288,6 +312,7 @@
         style="margin-top:22px;"
     >
 
+        @if (in_array($activeRole, ['owner', 'admin', 'manager'], true))
         <div class="panel">
 
             <div class="panel-header">
@@ -372,6 +397,7 @@
 
             </div>
         </div>
+        @endif
 
         <div class="panel">
 

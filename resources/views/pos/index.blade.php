@@ -823,6 +823,68 @@
 
                         </div>
 
+                        <div class="form-group" id="split-payment-toggle-group">
+                            <label class="form-label split-payment-toggle">
+                                <input
+                                    type="checkbox"
+                                    id="split-payment-toggle"
+                                    onchange="toggleSplitPayment()"
+                                    @checked(old('secondary_payment_method'))
+                                >
+                                Dividir por dois métodos
+                            </label>
+                            <div class="payment-hint">
+                                Exemplo: parte em dinheiro e parte por M-Pesa.
+                            </div>
+                        </div>
+
+                        <div id="secondary-payment-group" class="secondary-payment-panel" style="display:none;">
+                            <div class="form-group">
+                                <label class="form-label">Segundo método</label>
+                                <select
+                                    name="secondary_payment_method"
+                                    id="secondary-payment-method"
+                                    class="form-control"
+                                    onchange="calculatePaymentSummary()"
+                                    disabled
+                                >
+                                    <option value="">Seleccione</option>
+                                    <option value="cash" @selected(old('secondary_payment_method') === 'cash')>Dinheiro</option>
+                                    <option value="mpesa" @selected(old('secondary_payment_method') === 'mpesa')>M-Pesa</option>
+                                    <option value="emola" @selected(old('secondary_payment_method') === 'emola')>e-Mola</option>
+                                    <option value="card" @selected(old('secondary_payment_method') === 'card')>Cartão</option>
+                                    <option value="bank_transfer" @selected(old('secondary_payment_method') === 'bank_transfer')>Transferência</option>
+                                    <option value="other" @selected(old('secondary_payment_method') === 'other')>Outro</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Valor no segundo método</label>
+                                <input
+                                    type="number"
+                                    name="secondary_amount_received"
+                                    id="secondary-amount-received"
+                                    class="form-control"
+                                    min="0.01"
+                                    step="0.01"
+                                    value="{{ old('secondary_amount_received') }}"
+                                    oninput="calculatePaymentSummary()"
+                                    disabled
+                                >
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Referência do segundo pagamento</label>
+                                <input
+                                    type="text"
+                                    name="secondary_payment_reference"
+                                    id="secondary-payment-reference"
+                                    class="form-control"
+                                    value="{{ old('secondary_payment_reference') }}"
+                                    placeholder="Opcional"
+                                    disabled
+                                >
+                            </div>
+                        </div>
+
 
                         <button
                             type="submit"
@@ -951,6 +1013,8 @@
 /* =========================================================================
    CARRINHO
 ============================================================================ */
+
+.split-payment-toggle{display:flex;align-items:center;gap:9px;cursor:pointer}.split-payment-toggle input{width:18px;height:18px}.secondary-payment-panel{padding:14px;border:1px solid #dbe3ee;border-radius:12px;background:#f8fafc;margin-bottom:16px}.secondary-payment-panel .form-group:last-child{margin-bottom:0}
 
 .cart-item {
     padding:16px 0;
@@ -2548,6 +2612,8 @@
             type === 'full'
         ) {
 
+            document.getElementById('split-payment-toggle').disabled = false;
+
             conditionLabel.textContent =
                 'Pagamento total';
 
@@ -2589,6 +2655,8 @@
         if (
             type === 'partial'
         ) {
+
+            document.getElementById('split-payment-toggle').disabled = false;
 
             conditionLabel.textContent =
                 'Pagamento parcial';
@@ -2632,6 +2700,9 @@
             type === 'credit'
         ) {
 
+            document.getElementById('split-payment-toggle').checked = false;
+            document.getElementById('split-payment-toggle').disabled = true;
+
             conditionLabel.textContent =
                 'Venda a crédito';
 
@@ -2667,6 +2738,8 @@
         }
 
 
+        toggleSplitPayment();
+
         togglePaymentFields();
 
         calculatePaymentSummary();
@@ -2678,6 +2751,24 @@
     | Método de pagamento
     |--------------------------------------------------------------------------
     */
+
+    function toggleSplitPayment() {
+
+        const toggle = document.getElementById('split-payment-toggle');
+        const group = document.getElementById('secondary-payment-group');
+        const enabled = toggle.checked
+            && document.getElementById('payment-type').value !== 'credit';
+
+        group.style.display = enabled ? 'block' : 'none';
+
+        group.querySelectorAll('input, select').forEach(function (field) {
+            field.disabled = ! enabled;
+            field.required = enabled && field.id !== 'secondary-payment-reference';
+        });
+
+        togglePaymentFields();
+    }
+
 
     function togglePaymentFields() {
 
@@ -2704,6 +2795,11 @@
                 'amount-received'
             );
 
+        const splitPayment =
+            document.getElementById(
+                'split-payment-toggle'
+            ).checked;
+
 
         if (
             type === 'credit'
@@ -2719,6 +2815,7 @@
         if (
             type === 'full'
             && method !== 'cash'
+            && ! splitPayment
         ) {
 
             amountGroup.style.display =
@@ -2768,10 +2865,30 @@
             );
 
 
-        const received =
+        let received =
             parseFloat(
                 input.value || 0
             );
+
+        const splitPayment =
+            document.getElementById(
+                'split-payment-toggle'
+            ).checked
+            && type !== 'credit';
+
+        const secondaryMethod = splitPayment
+            ? document.getElementById('secondary-payment-method').value
+            : '';
+
+        if (splitPayment) {
+            received += parseFloat(
+                document.getElementById('secondary-amount-received').value || 0
+            );
+        }
+
+        const hasCash =
+            method === 'cash'
+            || secondaryMethod === 'cash';
 
 
         let applied = 0;
@@ -2785,6 +2902,7 @@
 
             if (
                 method === 'cash'
+                || splitPayment
             ) {
 
                 applied =
@@ -2902,7 +3020,7 @@
 
         if (
             type === 'full'
-            && method === 'cash'
+            && hasCash
         ) {
 
             changeBox.style.display =

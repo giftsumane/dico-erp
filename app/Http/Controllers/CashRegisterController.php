@@ -52,6 +52,17 @@ class CashRegisterController extends Controller
                 'cash'
             )
             ->sum('amount');
+
+            $paymentsByMethod = Payment::query()
+                ->where('cash_register_id', $currentRegister->id)
+                ->select('method', DB::raw('SUM(amount) as total'))
+                ->groupBy('method')
+                ->pluck('total', 'method')
+                ->map(fn ($total) => (float) $total);
+
+            $electronicTotal = (float) $paymentsByMethod
+                ->except('cash')
+                ->sum();
             
                 $salesCount = $currentRegister
                 ->sales()
@@ -108,6 +119,12 @@ class CashRegisterController extends Controller
 
                 'cash_sales' =>
                     (float) $cashSales,
+
+                'payments_by_method' =>
+                    $paymentsByMethod,
+
+                'electronic_total' =>
+                    $electronicTotal,
 
                 'manual_in' =>
                     (float) $manualIn,

@@ -135,6 +135,12 @@ class CoreErpOperationsTest extends TestCase
             ]],
         ];
 
+        $this->actingAs($this->owner)
+            ->withSession($this->context())
+            ->get(route('pos.index'))
+            ->assertOk()
+            ->assertSee('Dividir por dois métodos');
+
         $response = $this->actingAs($this->owner)
             ->withSession($this->context())
             ->post(route('pos.complete'), $payload);
@@ -222,6 +228,67 @@ class CoreErpOperationsTest extends TestCase
             'action' => 'receivable.payment_recorded',
             'subject_id' => $sale->id,
         ]);
+    }
+
+    public function test_pos_accepts_two_reconciled_payment_methods(): void
+    {
+        $product = $this->product(['sale_price' => 300]);
+        Stock::create([
+            'company_id' => $this->company->id,
+            'store_id' => $this->store->id,
+            'product_id' => $product->id,
+            'quantity' => 5,
+        ]);
+        CashRegister::create([
+            'company_id' => $this->company->id,
+            'store_id' => $this->store->id,
+            'user_id' => $this->owner->id,
+            'status' => 'open',
+            'opening_amount' => 0,
+            'opened_at' => now(),
+        ]);
+        $payload = [
+            'idempotency_key' => (string) Str::uuid(),
+            'payment_type' => 'full',
+            'payment_method' => 'cash',
+            'amount_received' => 100,
+            'payment_reference' => 'CAIXA',
+            'secondary_payment_method' => 'mpesa',
+            'secondary_amount_received' => 200,
+            'secondary_payment_reference' => 'MPESA-ABC',
+            'items' => [[
+                'product_id' => $product->id,
+                'quantity' => 1,
+            ]],
+        ];
+
+        $this->actingAs($this->owner)
+            ->withSession($this->context())
+            ->post(route('pos.complete'), $payload)
+            ->assertSessionHasNoErrors();
+
+        $sale = Sale::firstOrFail();
+        $this->assertSame('300.00', $sale->paid_total);
+        $this->assertSame('paid', $sale->payment_status);
+        $this->assertCount(2, $sale->payments);
+        $this->assertSame('100.00', $sale->payments->firstWhere('method', 'cash')->amount);
+        $this->assertSame('200.00', $sale->payments->firstWhere('method', 'mpesa')->amount);
+
+        $this->actingAs($this->owner)
+            ->withSession($this->context())
+            ->post(route('pos.complete'), $payload)
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseCount('sales', 1);
+        $this->assertDatabaseCount('payments', 2);
+        $this->assertSame('4.000', Stock::firstOrFail()->quantity);
+
+        $this->actingAs($this->owner)
+            ->withSession($this->context())
+            ->get(route('cash-registers.index'))
+            ->assertOk()
+            ->assertSee('Reconciliação por método')
+            ->assertSee('200,00');
     }
 
     public function test_operator_cannot_modify_another_operators_cash_register(): void
