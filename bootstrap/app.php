@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use App\Http\Middleware\EnsureBusinessContext;
 use App\Http\Middleware\EnsureRole;
 use App\Http\Middleware\EnsureFeatureEnabled;
+use App\Http\Middleware\EnsureSubscriptionActive;
 
 return Application::configure(
     basePath: dirname(__DIR__)
@@ -31,6 +32,9 @@ return Application::configure(
 
                 'feature' =>
                     EnsureFeatureEnabled::class,
+
+                'subscription.active' =>
+                    EnsureSubscriptionActive::class,
 
             ]);
         }

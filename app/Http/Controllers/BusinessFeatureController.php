@@ -166,6 +166,7 @@ class BusinessFeatureController extends Controller
             ->where('enabled', true)
             ->pluck('feature')
             ->toArray();
+        $entitledFeatures = $company->entitledFeatureKeys();
 
         return view(
             'settings.features',
@@ -173,7 +174,8 @@ class BusinessFeatureController extends Controller
                 'company',
                 'profiles',
                 'features',
-                'enabledFeatures'
+                'enabledFeatures',
+                'entitledFeatures'
             )
         );
     }
@@ -224,6 +226,13 @@ class BusinessFeatureController extends Controller
 
         $selectedFeatures =
             $data['features'] ?? [];
+
+        $entitledFeatures = $company->entitledFeatureKeys();
+        if ($entitledFeatures !== null && array_diff($selectedFeatures, $entitledFeatures)) {
+            return back()->withErrors([
+                'features' => 'Uma ou mais funcionalidades seleccionadas não fazem parte da subscrição da empresa.',
+            ])->withInput();
+        }
 
         foreach (
             CompanyFeatures::all()
@@ -294,9 +303,15 @@ class BusinessFeatureController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $company->applyBusinessProfile(
-            $data['business_type']
-        );
+        $profileFeatures = BusinessProfiles::defaults($data['business_type']);
+        $entitledFeatures = $company->entitledFeatureKeys();
+        if ($entitledFeatures !== null) {
+            $profileFeatures = array_values(array_intersect($profileFeatures, $entitledFeatures));
+        }
+        $company->update(['business_type' => $data['business_type']]);
+        foreach ($profileFeatures as $feature) {
+            $company->enableFeature($feature);
+        }
 
         return redirect()
             ->route(

@@ -400,6 +400,11 @@
                     </button>
                 </form>
 
+                <p style="text-align:center;margin:22px 0 0;color:var(--muted);">
+                    Ainda não tem conta?
+                    <a href="{{ route('register.company.create') }}" style="color:var(--primary);font-weight:800;text-decoration:none;">Registar empresa</a>
+                </p>
+
                 <div class="login-footer">
                     © {{ date('Y') }} DICO SOLUTIONS
                 </div>

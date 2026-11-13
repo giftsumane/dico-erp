@@ -274,6 +274,7 @@
                                     type="checkbox"
                                     name="features[]"
                                     value="{{ $featureKey }}"
+                                    @disabled($entitledFeatures !== null && ! in_array($featureKey, $entitledFeatures, true))
                                     @checked(
                                         in_array(
                                             $featureKey,
@@ -300,6 +301,10 @@
                                 <p>
                                     {{ $feature['description'] }}
                                 </p>
+
+                                @if($entitledFeatures !== null && ! in_array($featureKey, $entitledFeatures, true))
+                                    <span class="feature-advanced">Não incluído na subscrição</span>
+                                @endif
 
 
                                 @if (

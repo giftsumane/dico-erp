@@ -1741,6 +1741,14 @@
 
                 </a>
 
+                <a
+                    href="{{ route('settings.subscription.show') }}"
+                    class="sidebar-link {{ request()->routeIs('settings.subscription.*') ? 'active' : '' }}"
+                >
+                    <span class="sidebar-icon">◇</span>
+                    Subscrição
+                </a>
+
 
                 {{-- Perfil e funcionalidades --}}
 

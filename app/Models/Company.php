@@ -51,6 +51,30 @@ class Company extends Model
         return $this->hasMany(CompanyBankAccount::class)->orderBy('position');
     }
 
+    public function subscriptions(): HasMany
+    {
+        return $this->hasMany(CompanySubscription::class);
+    }
+
+    public function currentSubscription()
+    {
+        return $this->hasOne(CompanySubscription::class)->latestOfMany();
+    }
+
+    public function entitledFeatureKeys(): ?array
+    {
+        $subscription = $this->currentSubscription()->with('modules')->first();
+        if (! $subscription) {
+            return null; // empresas anteriores permanecem sem restrição durante a transição
+        }
+
+        $features = $subscription->modules->pluck('feature_key')->filter()->all();
+        if ($subscription->modules->contains('key', 'advanced_products')) {
+            $features = array_merge($features, ['brands', 'variants', 'stock_batches', 'expiry_dates']);
+        }
+        return array_values(array_unique($features));
+    }
+
     public function categories()
     {
         return $this->hasMany(Category::class);

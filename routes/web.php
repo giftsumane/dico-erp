@@ -3,6 +3,8 @@
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\RegisterCompanyController;
+use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\BusinessContextController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\CategoryController;
@@ -67,6 +69,11 @@ Route::middleware('guest')->group(function () {
         [LoginController::class, 'store']
     )->name('login.store');
 
+    Route::get('/register', [RegisterCompanyController::class, 'create'])
+        ->name('register.company.create');
+    Route::post('/register', [RegisterCompanyController::class, 'store'])
+        ->name('register.company.store');
+
 });
 
 
@@ -122,9 +129,10 @@ Route::middleware([
     |
     */
 
-    Route::middleware(
-        'role:owner,admin,manager,cashier'
-    )->group(function () {
+    Route::middleware([
+        'role:owner,admin,manager,cashier',
+        'subscription.active',
+    ])->group(function () {
 
 
         /*
@@ -950,6 +958,9 @@ Route::middleware([
             '/settings/company',
             [CompanySettingController::class, 'update']
         )->name('settings.company.update');
+
+        Route::get('/settings/subscription', [SubscriptionController::class, 'show'])
+            ->name('settings.subscription.show');
 
 
         /*
