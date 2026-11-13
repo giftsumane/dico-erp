@@ -135,7 +135,8 @@ class CommercialDocumentController extends Controller
 
     public function fromSale(Sale $sale, CommercialDocumentService $service)
     {
-        abort_unless($sale->company_id === app('activeCompany')->id && $sale->store_id === app('activeStore')?->id, 403);
+        abort_unless((int) $sale->company_id === (int) app('activeCompany')->id
+            && (int) $sale->store_id === (int) app('activeStore')?->id, 403);
         $document = $service->createFromSale($sale);
         return redirect()->route('commercial-documents.show', $document)
             ->with('success', 'Documento comercial gerado a partir da venda.');
@@ -202,7 +203,8 @@ class CommercialDocumentController extends Controller
 
     private function authorizeDocument(CommercialDocument $document): void
     {
-        abort_unless($document->company_id === app('activeCompany')->id && $document->store_id === app('activeStore')?->id, 403);
+        abort_unless((int) $document->company_id === (int) app('activeCompany')->id
+            && (int) $document->store_id === (int) app('activeStore')?->id, 403);
     }
 
     private function types(): array

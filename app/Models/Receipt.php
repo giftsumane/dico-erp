@@ -13,6 +13,8 @@ class Receipt extends Model
     ];
 
     protected $casts = [
+        'company_id' => 'integer', 'store_id' => 'integer', 'customer_id' => 'integer',
+        'user_id' => 'integer',
         'receipt_date' => 'date', 'amount' => 'decimal:2',
         'issued_at' => 'datetime', 'cancelled_at' => 'datetime',
     ];

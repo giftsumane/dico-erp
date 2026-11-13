@@ -53,11 +53,14 @@ class ReceiptController extends Controller
 
     private function authorizeInvoice(CommercialDocument $document): void
     {
-        abort_unless($document->company_id === app('activeCompany')->id && $document->store_id === app('activeStore')?->id && $document->isInvoice(), 403);
+        abort_unless((int) $document->company_id === (int) app('activeCompany')->id
+            && (int) $document->store_id === (int) app('activeStore')?->id
+            && $document->isInvoice(), 403);
     }
 
     private function authorizeReceipt(Receipt $receipt): void
     {
-        abort_unless($receipt->company_id === app('activeCompany')->id && $receipt->store_id === app('activeStore')?->id, 403);
+        abort_unless((int) $receipt->company_id === (int) app('activeCompany')->id
+            && (int) $receipt->store_id === (int) app('activeStore')?->id, 403);
     }
 }

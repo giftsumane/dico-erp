@@ -21,6 +21,8 @@ class CommercialDocument extends Model
     ];
 
     protected $casts = [
+        'company_id' => 'integer', 'store_id' => 'integer', 'customer_id' => 'integer',
+        'user_id' => 'integer', 'sale_id' => 'integer', 'source_document_id' => 'integer',
         'document_date' => 'date', 'valid_until' => 'date', 'due_date' => 'date',
         'issued_at' => 'datetime', 'cancelled_at' => 'datetime',
         'subtotal' => 'decimal:2', 'discount_total' => 'decimal:2',
