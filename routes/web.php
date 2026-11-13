@@ -227,6 +227,7 @@ Route::middleware([
             Route::put('/documents/{commercialDocument}', [CommercialDocumentController::class, 'update'])->name('commercial-documents.update');
             Route::post('/documents/{commercialDocument}/issue', [CommercialDocumentController::class, 'issue'])->name('commercial-documents.issue');
             Route::post('/documents/{commercialDocument}/convert', [CommercialDocumentController::class, 'convert'])->name('commercial-documents.convert');
+            Route::post('/documents/{commercialDocument}/revise', [CommercialDocumentController::class, 'reviseQuote'])->name('commercial-documents.revise');
             Route::post('/documents/{commercialDocument}/cancel', [CommercialDocumentController::class, 'cancel'])
                 ->middleware('role:owner,admin,manager')->name('commercial-documents.cancel');
             Route::get('/documents/{commercialDocument}/print', [CommercialDocumentController::class, 'print'])->name('commercial-documents.print');

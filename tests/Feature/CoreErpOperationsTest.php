@@ -674,6 +674,17 @@ class CoreErpOperationsTest extends TestCase
             ->get(route('commercial-documents.show', $quote))->assertOk()->assertSee($quote->number);
         $this->actingAs($this->owner)->withSession($this->context())
             ->get(route('commercial-documents.print', $quote))->assertOk()->assertSee($quote->number);
+        $this->actingAs($this->owner)->withSession($this->context())
+            ->get(route('commercial-documents.edit', $quote))
+            ->assertRedirect(route('commercial-documents.show', $quote))
+            ->assertSessionHas('error');
+        $this->actingAs($this->owner)->withSession($this->context())
+            ->post(route('commercial-documents.revise', $quote))
+            ->assertSessionHasNoErrors();
+        $revision = CommercialDocument::where('type', 'quote')->where('status', 'draft')->firstOrFail();
+        $this->assertSame($quote->id, $revision->source_document_id);
+        $this->actingAs($this->owner)->withSession($this->context())
+            ->get(route('commercial-documents.edit', $revision))->assertOk();
 
         $this->actingAs($this->owner)->withSession($this->context())
             ->post(route('commercial-documents.convert', $quote))->assertSessionHasNoErrors();
@@ -681,6 +692,8 @@ class CoreErpOperationsTest extends TestCase
         $this->assertSame('draft', $invoice->status);
         $this->assertSame($quote->id, $invoice->source_document_id);
         $this->assertSame('accepted', $quote->fresh()->status);
+        $this->actingAs($this->owner)->withSession($this->context())
+            ->get(route('commercial-documents.edit', $invoice))->assertOk();
         $this->assertDatabaseHas('audit_logs', ['action' => 'quote.converted', 'subject_id' => $quote->id]);
     }
 

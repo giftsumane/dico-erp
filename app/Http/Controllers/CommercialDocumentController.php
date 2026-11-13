@@ -63,7 +63,15 @@ class CommercialDocumentController extends Controller
     public function edit(CommercialDocument $commercialDocument)
     {
         $this->authorizeDocument($commercialDocument);
-        abort_unless($commercialDocument->isDraft(), 403, 'Apenas rascunhos podem ser alterados.');
+        if (! $commercialDocument->isDraft()) {
+            $guidance = $commercialDocument->type === CommercialDocument::TYPE_QUOTE
+                ? 'A cotação já foi emitida e ficou bloqueada para auditoria. Crie uma nova cotação para efectuar alterações.'
+                : 'O documento já foi emitido e não pode ser alterado. Para corrigir uma factura, emita uma nota de crédito ou débito ligada ao documento original.';
+
+            return redirect()
+                ->route('commercial-documents.show', $commercialDocument)
+                ->with('error', $guidance);
+        }
         $commercialDocument->load('items');
         return $this->form($commercialDocument);
     }
@@ -88,6 +96,41 @@ class CommercialDocumentController extends Controller
         $this->authorizeDocument($commercialDocument);
         $invoice = $service->convertQuote($commercialDocument->load('items'));
         return redirect()->route('commercial-documents.edit', $invoice)->with('success', 'Cotação convertida. Confirme os dados e emita a factura.');
+    }
+
+    public function reviseQuote(CommercialDocument $commercialDocument, CommercialDocumentService $service)
+    {
+        $this->authorizeDocument($commercialDocument);
+        abort_unless(
+            $commercialDocument->type === CommercialDocument::TYPE_QUOTE
+                && ! $commercialDocument->isDraft()
+                && $commercialDocument->status !== 'cancelled',
+            422,
+            'Apenas cotações emitidas podem gerar revisões.'
+        );
+
+        $commercialDocument->load('items');
+        $revision = new CommercialDocument([
+            'company_id' => $commercialDocument->company_id,
+            'store_id' => $commercialDocument->store_id,
+            'customer_id' => $commercialDocument->customer_id,
+            'user_id' => request()->user()->id,
+            'source_document_id' => $commercialDocument->id,
+            'type' => CommercialDocument::TYPE_QUOTE,
+            'document_date' => now()->toDateString(),
+            'valid_until' => now()->addDays(15)->toDateString(),
+            'currency' => $commercialDocument->currency,
+            'notes' => $commercialDocument->notes,
+            'terms' => $commercialDocument->terms,
+        ]);
+        $items = $commercialDocument->items->map(fn ($item) => $item->only([
+            'product_id', 'description', 'quantity', 'unit_price', 'discount', 'tax_rate',
+        ]))->all();
+        $revision = $service->saveDraft($revision, array_merge($revision->getAttributes(), ['items' => $items]));
+        app(AuditService::class)->record('quote.revised', $commercialDocument, ['revision_id' => $revision->id]);
+
+        return redirect()->route('commercial-documents.edit', $revision)
+            ->with('success', 'Foi criada uma nova revisão editável; a cotação original foi preservada.');
     }
 
     public function fromSale(Sale $sale, CommercialDocumentService $service)
