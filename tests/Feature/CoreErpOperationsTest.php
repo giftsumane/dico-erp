@@ -645,6 +645,11 @@ class CoreErpOperationsTest extends TestCase
 
     public function test_quote_can_be_issued_and_converted_to_an_invoice_draft(): void
     {
+        $this->company->bankAccounts()->create([
+            'position' => 1, 'bank_name' => 'Banco Principal',
+            'account_number' => '123456789', 'nib' => '000100020003000400005',
+            'iban' => 'MZ59000100020003000400005', 'swift_code' => 'BCMOMZMA',
+        ]);
         $customer = Customer::create([
             'company_id' => $this->company->id, 'name' => 'Cliente Cotação', 'active' => true,
         ]);
@@ -673,7 +678,8 @@ class CoreErpOperationsTest extends TestCase
         $this->actingAs($this->owner)->withSession($this->context())
             ->get(route('commercial-documents.show', $quote))->assertOk()->assertSee($quote->number);
         $this->actingAs($this->owner)->withSession($this->context())
-            ->get(route('commercial-documents.print', $quote))->assertOk()->assertSee($quote->number);
+            ->get(route('commercial-documents.print', $quote))->assertOk()
+            ->assertSee($quote->number)->assertSee('Banco Principal')->assertSee('BCMOMZMA');
         $this->actingAs($this->owner)->withSession($this->context())
             ->get(route('commercial-documents.edit', $quote))
             ->assertRedirect(route('commercial-documents.show', $quote))
@@ -766,6 +772,32 @@ class CoreErpOperationsTest extends TestCase
         $this->assertSame('invoice_receipt', $document->type);
         $this->assertSame('paid', $document->status);
         $this->assertStringStartsWith('FR-', $document->number);
+    }
+
+    public function test_company_settings_store_at_most_two_bank_accounts(): void
+    {
+        $response = $this->actingAs($this->owner)->withSession($this->context())
+            ->put(route('settings.company.update'), [
+                'name' => $this->company->name,
+                'currency' => 'MZN', 'timezone' => 'Africa/Maputo', 'default_tax_rate' => 16,
+                'bank_accounts' => [
+                    ['bank_name' => 'Banco Um', 'account_number' => '001', 'nib' => 'NIB-1', 'iban' => 'IBAN-1', 'swift_code' => 'SWIFT1'],
+                    ['bank_name' => 'Banco Dois', 'account_number' => '002', 'nib' => 'NIB-2', 'iban' => 'IBAN-2', 'swift_code' => 'SWIFT2'],
+                ],
+            ]);
+
+        $response->assertSessionHasNoErrors()->assertRedirect(route('settings.company.edit'));
+        $this->assertSame(2, $this->company->bankAccounts()->count());
+        $this->assertDatabaseHas('company_bank_accounts', [
+            'company_id' => $this->company->id, 'position' => 2, 'bank_name' => 'Banco Dois',
+        ]);
+
+        $this->actingAs($this->owner)->withSession($this->context())
+            ->put(route('settings.company.update'), [
+                'name' => $this->company->name,
+                'currency' => 'MZN', 'timezone' => 'Africa/Maputo', 'default_tax_rate' => 16,
+                'bank_accounts' => [[], [], []],
+            ])->assertSessionHasErrors('bank_accounts');
     }
 
     private function product(array $overrides = []): Product

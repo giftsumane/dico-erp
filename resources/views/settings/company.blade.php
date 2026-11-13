@@ -261,6 +261,36 @@
                 >
             </div>
 
+            <div style="margin-top:30px;padding-top:24px;border-top:1px solid var(--border);">
+                <h2 class="panel-title">Dados bancários</h2>
+                <p class="panel-subtitle" style="margin-bottom:18px;">
+                    Pode indicar até duas contas. Só contas com o nome do banco preenchido serão apresentadas nas cotações e facturas.
+                </p>
+
+                @for ($index = 0; $index < 2; $index++)
+                    @php $bankAccount = $company->bankAccounts->get($index); @endphp
+                    <div style="padding:18px;border:1px solid var(--border);border-radius:12px;margin-bottom:16px;">
+                        <strong>Conta bancária {{ $index + 1 }}</strong>
+                        <div class="form-row" style="margin-top:14px;">
+                            <div class="form-group">
+                                <label class="form-label">Nome do banco</label>
+                                <input type="text" class="form-control" name="bank_accounts[{{ $index }}][bank_name]" value="{{ old("bank_accounts.$index.bank_name", $bankAccount?->bank_name) }}" maxlength="150">
+                                @error("bank_accounts.$index.bank_name")<div class="error-message">{{ $message }}</div>@enderror
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Número de conta</label>
+                                <input type="text" class="form-control" name="bank_accounts[{{ $index }}][account_number]" value="{{ old("bank_accounts.$index.account_number", $bankAccount?->account_number) }}" maxlength="100">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label class="form-label">NIB</label><input type="text" class="form-control" name="bank_accounts[{{ $index }}][nib]" value="{{ old("bank_accounts.$index.nib", $bankAccount?->nib) }}" maxlength="100"></div>
+                            <div class="form-group"><label class="form-label">IBAN</label><input type="text" class="form-control" name="bank_accounts[{{ $index }}][iban]" value="{{ old("bank_accounts.$index.iban", $bankAccount?->iban) }}" maxlength="100"></div>
+                            <div class="form-group"><label class="form-label">SWIFT CODE</label><input type="text" class="form-control" name="bank_accounts[{{ $index }}][swift_code]" value="{{ old("bank_accounts.$index.swift_code", $bankAccount?->swift_code) }}" maxlength="50"></div>
+                        </div>
+                    </div>
+                @endfor
+            </div>
+
             <div class="form-group">
                 <label class="form-label">
                     Rodapé do recibo

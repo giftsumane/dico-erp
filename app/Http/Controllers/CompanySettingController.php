@@ -3,12 +3,14 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CompanySettingController extends Controller
 {
     public function edit()
     {
         $company = app('activeCompany');
+        $company->load('bankAccounts');
 
         return view(
             'settings.company',
@@ -86,9 +88,35 @@ class CompanySettingController extends Controller
                 'string',
                 'max:1000',
             ],
+
+            'bank_accounts' => ['nullable', 'array', 'max:2'],
+            'bank_accounts.*.bank_name' => ['nullable', 'string', 'max:150'],
+            'bank_accounts.*.account_number' => ['nullable', 'string', 'max:100'],
+            'bank_accounts.*.nib' => ['nullable', 'string', 'max:100'],
+            'bank_accounts.*.iban' => ['nullable', 'string', 'max:100'],
+            'bank_accounts.*.swift_code' => ['nullable', 'string', 'max:50'],
         ]);
 
-        $company->update($data);
+        $accounts = collect($data['bank_accounts'] ?? [])->take(2)
+            ->filter(fn ($account) => collect($account)->filter(fn ($value) => filled($value))->isNotEmpty())
+            ->values();
+        unset($data['bank_accounts']);
+
+        foreach ($accounts as $index => $account) {
+            if (blank($account['bank_name'] ?? null)) {
+                return back()->withErrors([
+                    "bank_accounts.{$index}.bank_name" => 'Indique o nome do banco para esta conta.',
+                ])->withInput();
+            }
+        }
+
+        DB::transaction(function () use ($company, $data, $accounts) {
+            $company->update($data);
+            $company->bankAccounts()->delete();
+            foreach ($accounts as $index => $account) {
+                $company->bankAccounts()->create(array_merge($account, ['position' => $index + 1]));
+            }
+        });
 
         return redirect()
             ->route('settings.company.edit')

@@ -46,6 +46,11 @@ class Company extends Model
             ->withTimestamps();
     }
 
+    public function bankAccounts(): HasMany
+    {
+        return $this->hasMany(CompanyBankAccount::class)->orderBy('position');
+    }
+
     public function categories()
     {
         return $this->hasMany(Category::class);

@@ -56,7 +56,7 @@ class CommercialDocumentController extends Controller
     public function show(CommercialDocument $commercialDocument)
     {
         $this->authorizeDocument($commercialDocument);
-        $commercialDocument->load(['customer', 'store', 'user', 'items.product', 'sourceDocument', 'derivedDocuments', 'receiptAllocations.receipt']);
+        $commercialDocument->load(['company.bankAccounts', 'customer', 'store', 'user', 'items.product', 'sourceDocument', 'derivedDocuments', 'receiptAllocations.receipt']);
         return view('commercial-documents.show', compact('commercialDocument'));
     }
 
@@ -155,7 +155,7 @@ class CommercialDocumentController extends Controller
     public function print(CommercialDocument $commercialDocument)
     {
         $this->authorizeDocument($commercialDocument);
-        $commercialDocument->load(['company', 'store', 'customer', 'items']);
+        $commercialDocument->load(['company.bankAccounts', 'store', 'customer', 'items']);
         return view('commercial-documents.print', ['document' => $commercialDocument]);
     }
 
