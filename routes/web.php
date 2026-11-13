@@ -33,6 +33,8 @@ use App\Http\Controllers\EventOperationsDashboardController;
 use App\Http\Controllers\EventWarehouseController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\CommercialDocumentController;
+use App\Http\Controllers\ReceiptController;
 
 /*
 |--------------------------------------------------------------------------
@@ -216,6 +218,25 @@ Route::middleware([
 
             Route::get('/returns', [ReturnBrowseController::class, 'index'])->name('returns.index');
             Route::get('/returns/{saleReturn}', [ReturnBrowseController::class, 'show'])->name('returns.show');
+
+            Route::get('/documents', [CommercialDocumentController::class, 'index'])->name('commercial-documents.index');
+            Route::get('/documents/create', [CommercialDocumentController::class, 'create'])->name('commercial-documents.create');
+            Route::post('/documents', [CommercialDocumentController::class, 'store'])->name('commercial-documents.store');
+            Route::get('/documents/{commercialDocument}', [CommercialDocumentController::class, 'show'])->name('commercial-documents.show');
+            Route::get('/documents/{commercialDocument}/edit', [CommercialDocumentController::class, 'edit'])->name('commercial-documents.edit');
+            Route::put('/documents/{commercialDocument}', [CommercialDocumentController::class, 'update'])->name('commercial-documents.update');
+            Route::post('/documents/{commercialDocument}/issue', [CommercialDocumentController::class, 'issue'])->name('commercial-documents.issue');
+            Route::post('/documents/{commercialDocument}/convert', [CommercialDocumentController::class, 'convert'])->name('commercial-documents.convert');
+            Route::post('/documents/{commercialDocument}/cancel', [CommercialDocumentController::class, 'cancel'])
+                ->middleware('role:owner,admin,manager')->name('commercial-documents.cancel');
+            Route::get('/documents/{commercialDocument}/print', [CommercialDocumentController::class, 'print'])->name('commercial-documents.print');
+            Route::post('/sales/{sale}/commercial-document', [CommercialDocumentController::class, 'fromSale'])->name('commercial-documents.from-sale');
+
+            Route::get('/receipts', [ReceiptController::class, 'index'])->name('receipts.index');
+            Route::get('/documents/{commercialDocument}/receipts/create', [ReceiptController::class, 'create'])->name('receipts.create');
+            Route::post('/documents/{commercialDocument}/receipts', [ReceiptController::class, 'store'])->name('receipts.store');
+            Route::get('/receipts/{receipt}', [ReceiptController::class, 'show'])->name('receipts.show');
+            Route::get('/receipts/{receipt}/print', [ReceiptController::class, 'print'])->name('receipts.print');
 
 
             /*

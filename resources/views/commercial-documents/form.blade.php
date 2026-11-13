@@ -1,0 +1,35 @@
+@extends('layouts.app')
+@section('title', ($document->exists ? 'Editar' : 'Novo').' Documento | DICO')
+@section('topbar-title', 'Faturação')
+@section('content')
+@php
+    $existing = old('items', $document->items?->map(fn($i)=>$i->only(['product_id','description','quantity','unit_price','discount','tax_rate']))->all() ?: [['product_id'=>'','description'=>'','quantity'=>1,'unit_price'=>0,'discount'=>0,'tax_rate'=>$activeCompany->default_tax_rate ?? 0]]);
+@endphp
+<div class="page-heading"><h1>{{ $document->exists ? 'Editar rascunho' : 'Novo documento comercial' }}</h1><p>Os documentos emitidos ficam bloqueados para preservar a auditoria.</p></div>
+<form method="POST" action="{{ $document->exists ? route('commercial-documents.update',$document) : route('commercial-documents.store') }}">
+@csrf @if($document->exists) @method('PUT') @endif
+<div class="panel"><div class="panel-body">
+    <div class="form-row">
+        <div class="form-group"><label class="form-label">Tipo</label><select class="form-control" name="type" required>
+            @foreach(['quote'=>'Cotação','invoice'=>'Factura','invoice_receipt'=>'Factura-recibo','credit_note'=>'Nota de crédito','debit_note'=>'Nota de débito'] as $key=>$label)<option value="{{ $key }}" @selected(old('type',$document->type)===$key)>{{ $label }}</option>@endforeach
+        </select></div>
+        <div class="form-group"><label class="form-label">Cliente</label><select class="form-control" name="customer_id" required><option value="">Seleccione...</option>@foreach($customers as $customer)<option value="{{ $customer->id }}" @selected((string)old('customer_id',$document->customer_id)===(string)$customer->id)>{{ $customer->name }}{{ $customer->nuit ? ' — '.$customer->nuit : '' }}</option>@endforeach</select></div>
+    </div>
+    <div class="form-group"><label class="form-label">Factura de origem <small>(obrigatória para notas de crédito/débito)</small></label><select class="form-control" name="source_document_id"><option value="">Não aplicável</option>@foreach($sourceInvoices as $source)<option value="{{ $source->id }}" @selected((string)old('source_document_id',$document->source_document_id)===(string)$source->id)>{{ $source->number }} · {{ $source->customer?->name }} · {{ number_format($source->total,2,',','.') }} MT</option>@endforeach</select></div>
+    <div class="form-row">
+        <div class="form-group"><label class="form-label">Data</label><input type="date" class="form-control" name="document_date" value="{{ old('document_date',optional($document->document_date)->format('Y-m-d') ?: now()->format('Y-m-d')) }}" required></div>
+        <div class="form-group"><label class="form-label">Válida até (cotação)</label><input type="date" class="form-control" name="valid_until" value="{{ old('valid_until',optional($document->valid_until)->format('Y-m-d')) }}"></div>
+        <div class="form-group"><label class="form-label">Vencimento (factura)</label><input type="date" class="form-control" name="due_date" value="{{ old('due_date',optional($document->due_date)->format('Y-m-d')) }}"></div>
+    </div>
+</div></div>
+<div class="panel" style="margin-top:20px"><div class="panel-header"><div><h2 class="panel-title">Itens</h2><p class="panel-subtitle">Produtos ou serviços. A cotação não movimenta stock.</p></div><button class="topbar-button" type="button" id="add-item">+ Item</button></div>
+<div style="overflow-x:auto"><table style="width:100%;min-width:900px;border-collapse:collapse"><thead><tr><th style="padding:12px">Produto</th><th style="padding:12px">Descrição</th><th style="padding:12px">Qtd.</th><th style="padding:12px">Preço</th><th style="padding:12px">Desconto</th><th style="padding:12px">IVA %</th><th style="padding:12px"></th></tr></thead><tbody id="items-body"></tbody></table></div></div>
+<div class="panel" style="margin-top:20px"><div class="panel-body"><div class="form-row"><div class="form-group"><label class="form-label">Observações</label><textarea class="form-control" name="notes" style="min-height:100px">{{ old('notes',$document->notes) }}</textarea></div><div class="form-group"><label class="form-label">Condições</label><textarea class="form-control" name="terms" style="min-height:100px">{{ old('terms',$document->terms) }}</textarea></div></div></div></div>
+@if($errors->any())<div class="panel" style="margin-top:16px;border-color:#c0392b"><div class="panel-body" style="color:#a93226"><strong>Corrija os seguintes campos:</strong><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div></div>@endif
+<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px"><a class="topbar-button" href="{{ route('commercial-documents.index') }}">Cancelar</a><button class="topbar-button" style="background:var(--primary);color:#fff" type="submit">Guardar rascunho</button></div>
+</form>
+<template id="item-template"><tr style="border-top:1px solid var(--border)"><td style="padding:8px"><select class="form-control product" data-name="product_id"><option value="">Serviço/livre</option>@foreach($products as $product)<option value="{{ $product->id }}" data-description="{{ $product->name }}" data-price="{{ $product->sale_price }}" data-tax="{{ $product->tax_rate }}">{{ $product->name }}</option>@endforeach</select></td><td style="padding:8px"><input class="form-control" data-name="description" required></td><td style="padding:8px"><input type="number" min="0.001" step="0.001" class="form-control" data-name="quantity" value="1" required></td><td style="padding:8px"><input type="number" min="0" step="0.01" class="form-control" data-name="unit_price" value="0" required></td><td style="padding:8px"><input type="number" min="0" step="0.01" class="form-control" data-name="discount" value="0"></td><td style="padding:8px"><input type="number" min="0" max="100" step="0.01" class="form-control" data-name="tax_rate" value="0"></td><td style="padding:8px"><button type="button" class="topbar-button remove">×</button></td></tr></template>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{const body=document.getElementById('items-body'),tpl=document.getElementById('item-template');let rows=@json($existing);function renumber(){[...body.children].forEach((row,i)=>row.querySelectorAll('[data-name]').forEach(el=>el.name=`items[${i}][${el.dataset.name}]`));}function add(values={}){const row=tpl.content.firstElementChild.cloneNode(true);body.appendChild(row);Object.entries(values).forEach(([k,v])=>{const el=row.querySelector(`[data-name="${k}"]`);if(el)el.value=v??''});row.querySelector('.product').addEventListener('change',e=>{const o=e.target.selectedOptions[0];if(!o.value)return;row.querySelector('[data-name="description"]').value=o.dataset.description;row.querySelector('[data-name="unit_price"]').value=o.dataset.price;row.querySelector('[data-name="tax_rate"]').value=o.dataset.tax});row.querySelector('.remove').addEventListener('click',()=>{if(body.children.length>1){row.remove();renumber()}});renumber()}rows.forEach(add);document.getElementById('add-item').addEventListener('click',()=>add())});
+</script>
+@endsection

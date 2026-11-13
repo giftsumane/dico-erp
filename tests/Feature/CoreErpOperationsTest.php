@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\CashRegister;
 use App\Models\AuditLog;
+use App\Models\CommercialDocument;
+use App\Models\Receipt;
 use App\Models\Company;
 use App\Models\Customer;
 use App\Models\Product;
@@ -639,6 +641,118 @@ class CoreErpOperationsTest extends TestCase
         $client->get(route('purchases.show', $otherPurchase))->assertForbidden();
         $client->get(route('sales.show', $otherSale))->assertForbidden();
         $client->get(route('pos.receipt', $otherSale))->assertForbidden();
+    }
+
+    public function test_quote_can_be_issued_and_converted_to_an_invoice_draft(): void
+    {
+        $customer = Customer::create([
+            'company_id' => $this->company->id, 'name' => 'Cliente Cotação', 'active' => true,
+        ]);
+        $product = $this->product(['name' => 'Serviço Comercial', 'sale_price' => 1000, 'tax_rate' => 16]);
+
+        $response = $this->actingAs($this->owner)->withSession($this->context())
+            ->post(route('commercial-documents.store'), [
+                'type' => 'quote', 'customer_id' => $customer->id,
+                'document_date' => now()->toDateString(),
+                'valid_until' => now()->addDays(7)->toDateString(),
+                'items' => [[
+                    'product_id' => $product->id, 'description' => $product->name,
+                    'quantity' => 2, 'unit_price' => 1000, 'discount' => 100, 'tax_rate' => 16,
+                ]],
+            ]);
+
+        $quote = CommercialDocument::where('type', 'quote')->firstOrFail();
+        $response->assertRedirect(route('commercial-documents.show', $quote));
+        $this->assertSame('2204.00', $quote->total);
+
+        $this->actingAs($this->owner)->withSession($this->context())
+            ->post(route('commercial-documents.issue', $quote))->assertSessionHasNoErrors();
+        $quote->refresh();
+        $this->assertSame('issued', $quote->status);
+        $this->assertStringStartsWith('COT-', $quote->number);
+        $this->actingAs($this->owner)->withSession($this->context())
+            ->get(route('commercial-documents.show', $quote))->assertOk()->assertSee($quote->number);
+        $this->actingAs($this->owner)->withSession($this->context())
+            ->get(route('commercial-documents.print', $quote))->assertOk()->assertSee($quote->number);
+
+        $this->actingAs($this->owner)->withSession($this->context())
+            ->post(route('commercial-documents.convert', $quote))->assertSessionHasNoErrors();
+        $invoice = CommercialDocument::where('type', 'invoice')->firstOrFail();
+        $this->assertSame('draft', $invoice->status);
+        $this->assertSame($quote->id, $invoice->source_document_id);
+        $this->assertSame('accepted', $quote->fresh()->status);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'quote.converted', 'subject_id' => $quote->id]);
+    }
+
+    public function test_invoice_accepts_idempotent_partial_and_final_receipts(): void
+    {
+        $customer = Customer::create([
+            'company_id' => $this->company->id, 'name' => 'Cliente Factura', 'active' => true,
+        ]);
+        $invoice = CommercialDocument::create([
+            'company_id' => $this->company->id, 'store_id' => $this->store->id,
+            'customer_id' => $customer->id, 'user_id' => $this->owner->id,
+            'type' => 'invoice', 'status' => 'draft', 'document_date' => now(),
+            'currency' => 'MZN', 'subtotal' => 1000, 'tax_total' => 0,
+            'total' => 1000, 'paid_total' => 0, 'balance_due' => 1000,
+        ]);
+        $invoice->items()->create([
+            'description' => 'Prestação de serviço', 'quantity' => 1, 'unit_price' => 1000,
+            'discount' => 0, 'tax_rate' => 0, 'subtotal' => 1000, 'tax_total' => 0, 'total' => 1000,
+        ]);
+        $this->actingAs($this->owner)->withSession($this->context())
+            ->post(route('commercial-documents.issue', $invoice))->assertSessionHasNoErrors();
+
+        $key = (string) Str::uuid();
+        $payload = ['receipt_date' => now()->toDateString(), 'amount' => 400, 'payment_method' => 'mpesa', 'idempotency_key' => $key];
+        $client = $this->actingAs($this->owner)->withSession($this->context());
+        $client->post(route('receipts.store', $invoice), $payload)->assertSessionHasNoErrors();
+        $client->post(route('receipts.store', $invoice), $payload)->assertSessionHasNoErrors();
+
+        $this->assertSame(1, Receipt::count());
+        $firstReceipt = Receipt::firstOrFail();
+        $client->get(route('receipts.show', $firstReceipt))->assertOk()->assertSee($firstReceipt->number);
+        $client->get(route('receipts.print', $firstReceipt))->assertOk()->assertSee($firstReceipt->number);
+        $this->assertSame('partially_paid', $invoice->fresh()->status);
+        $this->assertSame('600.00', $invoice->fresh()->balance_due);
+
+        $client->post(route('receipts.store', $invoice), [
+            'receipt_date' => now()->toDateString(), 'amount' => 600,
+            'payment_method' => 'bank_transfer', 'idempotency_key' => (string) Str::uuid(),
+        ])->assertSessionHasNoErrors();
+        $this->assertSame('paid', $invoice->fresh()->status);
+        $this->assertSame('0.00', $invoice->fresh()->balance_due);
+        $this->assertCount(2, Receipt::all());
+    }
+
+    public function test_completed_customer_sale_generates_one_invoice_receipt(): void
+    {
+        $customer = Customer::create([
+            'company_id' => $this->company->id, 'name' => 'Cliente POS', 'active' => true,
+        ]);
+        $product = $this->product(['sale_price' => 500]);
+        $sale = Sale::create([
+            'company_id' => $this->company->id, 'store_id' => $this->store->id,
+            'customer_id' => $customer->id, 'user_id' => $this->owner->id,
+            'number' => 'VND-FAT-1', 'status' => 'completed', 'subtotal' => 500,
+            'discount_total' => 0, 'tax_total' => 0, 'total' => 500,
+            'paid_total' => 500, 'change_total' => 0, 'amount_due' => 0,
+            'payment_status' => 'paid', 'completed_at' => now(),
+        ]);
+        $sale->items()->create([
+            'product_id' => $product->id, 'quantity' => 1, 'unit_price' => 500,
+            'discount' => 0, 'tax_rate' => 0, 'subtotal' => 500, 'tax_total' => 0, 'total' => 500,
+        ]);
+
+        $client = $this->actingAs($this->owner)->withSession($this->context());
+        $client->post(route('commercial-documents.from-sale', $sale))->assertSessionHasNoErrors();
+        $client->post(route('commercial-documents.from-sale', $sale))->assertSessionHasNoErrors();
+
+        $this->assertSame(1, CommercialDocument::where('sale_id', $sale->id)->count());
+        $document = CommercialDocument::where('sale_id', $sale->id)->firstOrFail();
+        $this->assertSame('invoice_receipt', $document->type);
+        $this->assertSame('paid', $document->status);
+        $this->assertStringStartsWith('FR-', $document->number);
     }
 
     private function product(array $overrides = []): Product

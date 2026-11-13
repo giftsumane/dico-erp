@@ -1242,6 +1242,21 @@
             @endif
 
 
+            {{-- Documentos comerciais - FEATURE: sales --}}
+
+            @if ($canOperate && $canSales)
+
+                <a
+                    href="{{ route('commercial-documents.index') }}"
+                    class="sidebar-link {{ request()->routeIs('commercial-documents.*', 'receipts.*') ? 'active' : '' }}"
+                >
+                    <span class="sidebar-icon">▧</span>
+                    Faturação
+                </a>
+
+            @endif
+
+
             {{-- Devoluções - FEATURE: sales --}}
 
             @if ($canOperate && $canSales)

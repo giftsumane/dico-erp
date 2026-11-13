@@ -84,6 +84,15 @@
                 Ver recibo
             </a>
 
+            @if ($sale->customer_id && $sale->status === 'completed')
+                <form method="POST" action="{{ route('commercial-documents.from-sale', $sale) }}">
+                    @csrf
+                    <button type="submit" class="topbar-button">
+                        Emitir factura
+                    </button>
+                </form>
+            @endif
+
 
             @if (
                 (float) $sale->amount_due > 0

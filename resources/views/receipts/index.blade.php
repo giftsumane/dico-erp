@@ -1,0 +1,8 @@
+@extends('layouts.app')
+@section('title','Recibos | DICO')
+@section('topbar-title','Faturação')
+@section('content')
+@php $methods=['cash'=>'Dinheiro','mpesa'=>'M-Pesa','emola'=>'e-Mola','card'=>'Cartão','bank_transfer'=>'Transferência','other'=>'Outro']; @endphp
+<div class="page-heading"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><h1>Recibos</h1><p>Pagamentos recebidos e aplicados às facturas.</p></div><a class="topbar-button" href="{{ route('commercial-documents.index') }}">Documentos comerciais</a></div></div>
+<div class="panel"><div style="overflow-x:auto"><table style="width:100%;min-width:680px;border-collapse:collapse"><thead><tr><th style="padding:14px;text-align:left">Número</th><th style="padding:14px;text-align:left">Cliente</th><th style="padding:14px;text-align:left">Data</th><th style="padding:14px;text-align:left">Método</th><th style="padding:14px;text-align:right">Valor</th></tr></thead><tbody>@forelse($receipts as $receipt)<tr style="border-top:1px solid var(--border)"><td style="padding:14px"><a href="{{ route('receipts.show',$receipt) }}"><strong>{{ $receipt->number }}</strong></a></td><td style="padding:14px">{{ $receipt->customer->name }}</td><td style="padding:14px">{{ $receipt->receipt_date->format('d/m/Y') }}</td><td style="padding:14px">{{ $methods[$receipt->payment_method] ?? $receipt->payment_method }}</td><td style="padding:14px;text-align:right">{{ number_format($receipt->amount,2,',','.') }} MT</td></tr>@empty<tr><td colspan="5" style="padding:30px;text-align:center">Ainda não existem recibos.</td></tr>@endforelse</tbody></table></div><div style="padding:16px">{{ $receipts->links() }}</div></div>
+@endsection
